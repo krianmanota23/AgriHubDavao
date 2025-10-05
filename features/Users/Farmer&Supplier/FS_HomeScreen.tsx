@@ -1,0 +1,1655 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
+import { useRouter } from 'expo-router';
+import FS_Footer from '../../../components/navigation-components/FS_Footer';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  Alert,
+  ScrollView,
+  Modal,
+  FlatList,
+  TextInput,
+  Image,
+  StatusBar,
+  Platform,
+} from 'react-native';
+// import FS_Header from '../components/FS_Header';
+// import Footer from '../components/Footer';
+
+// Types and Interfaces
+interface ImageData {
+  uri: string;
+  type: string;
+  name: string;
+}
+
+interface Post {
+  id: number;
+  author: string;
+  userType: string;
+  storeName: string;
+  status: 'Selling' | 'Buying';
+  title?: string;
+  content: string;
+  timestamp: string;
+  reactions: number;
+  comments: number;
+  starRating?: number;
+  totalReviews?: number;
+  images?: string[];
+}
+
+interface NewPost {
+  title: string;
+  content: string;
+  status: 'Selling' | 'Buying';
+  images: ImageData[];
+  shareLocation: boolean;
+}
+
+interface FarmerSupplierHomeScreenProps {
+  route: {
+    params: {
+      user: UserData;
+    };
+  };
+  navigation: any;
+}
+
+const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigation }) => {
+  const router = useRouter();
+  const { user } = route.params;
+  const [currentUser, setCurrentUser] = useState<UserData>(user);
+  const [showBurgerMenu, setShowBurgerMenu] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>('Home');
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showCreatePostModal, setShowCreatePostModal] = useState<boolean>(false);
+  const [newPost, setNewPost] = useState<NewPost>({
+    title: '',
+    content: '',
+    status: 'Selling',
+    images: [],
+    shareLocation: false
+  });
+  const [showCommentsModal, setShowCommentsModal] = useState<boolean>(false);
+  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
+  const [showMessageModal, setShowMessageModal] = useState<boolean>(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [newComment, setNewComment] = useState<string>('');
+  const [commentImages, setCommentImages] = useState<ImageData[]>([]);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [newMessage, setNewMessage] = useState<string>('');
+
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      const userData = await getCurrentUser();
+      if (userData) {
+        setCurrentUser(userData);
+      }
+    };
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      const userData = await getCurrentUser();
+      if (userData) {
+        setCurrentUser(userData);
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  // Create a navigation adapter for the footer component
+  const footerNavigation = {
+    navigate: (screen: string, params?: any) => {
+      if (screen === 'MessagesScreen') {
+        router.push('/messages');
+      } else if (screen === 'NotificationsScreen') {
+        Alert.alert('Coming Soon', 'Notifications feature is under development');
+      } else if (screen === 'FriendsScreen') {
+        router.push('/friends');
+      } else if (screen === 'FS_Profile') {
+        router.push('/fs-profile');
+      }
+    }
+  };
+
+  // Mock data for Store Owner posts (visible to Farmer/Supplier)
+  const storeOwnerPosts: Post[] = [
+    {
+      id: 1,
+      author: 'Christian Manota',
+      userType: 'Store Owner',
+      storeName: 'Manota Store',
+      status: 'Buying',
+      title: 'Looking for Vegetables Supplier',
+      content: 'Need regular supply for my store. Competitive prices offered.',
+      timestamp: '30 minutes ago',
+      reactions: 12,
+      comments: 4,
+      images: ['https://via.placeholder.com/300x200/2196F3/FFFFFF?text=Vegetables+Needed'],
+    },
+    {
+      id: 2,
+      author: 'Maria Garcia',
+      userType: 'Store Owner',
+      storeName: 'Garcia Market',
+      status: 'Buying',
+      title: 'Rice Supplier Needed',
+      content: 'Need 100kg weekly. Long-term partnership preferred.',
+      timestamp: '2 hours ago',
+      reactions: 18,
+      comments: 7,
+    },
+    {
+      id: 3,
+      author: 'John Smith',
+      userType: 'Store Owner',
+      storeName: 'Smith Grocery',
+      status: 'Buying',
+      title: 'Fruit Supplier Wanted',
+      content: 'Looking for quality products at reasonable prices.',
+      timestamp: '5 hours ago',
+      reactions: 15,
+      comments: 6,
+    },
+  ];
+
+  // Filter only buying posts for farmers/suppliers
+  const buyingPosts = storeOwnerPosts.filter(post => post.status === 'Buying');
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          onPress: async () => {
+            await clearCurrentUser();
+            navigation.navigate('Login');
+          }
+        }
+      ]
+    );
+  };
+
+  const renderPost = ({ item }: { item: Post }) => (
+    <View style={styles.postContainer}>
+      <View style={styles.postHeader}>
+        <TouchableOpacity 
+          style={styles.profilePicture}
+          onPress={() => {
+            if (item.userType === 'Store Owner') {
+              router.push({
+                pathname: '/storeo-profile-view',
+                params: {
+                  storeOwner: JSON.stringify(item),
+                  currentUser: JSON.stringify(currentUser)
+                }
+              });
+            }
+          }}
+        >
+          <Text style={styles.profilePictureText}>
+            {item.userType === 'Store Owner' ? '🏪' : '👤'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.authorInfo}
+          onPress={() => {
+            if (item.userType === 'Store Owner') {
+              router.push({
+                pathname: '/storeo-profile-view',
+                params: {
+                  storeOwner: JSON.stringify(item),
+                  currentUser: JSON.stringify(currentUser)
+                }
+              });
+            }
+          }}
+        >
+          <Text style={styles.authorName}>{item.storeName}</Text>
+          <Text style={styles.userType}>{item.userType}</Text>
+          <Text style={styles.storeName}>{item.author}</Text>
+          {/* Star Rating for Store Owners */}
+          {item.starRating && (
+            <View style={styles.ratingContainer}>
+              <View style={styles.starsContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Text key={star} style={[
+                    styles.star,
+                    star <= Math.floor(item.starRating!) ? styles.filledStar : styles.emptyStar
+                  ]}>
+                    {star <= Math.floor(item.starRating!) ? '★' : '☆'}
+                  </Text>
+                ))}
+              </View>
+              <Text style={styles.ratingText}>{item.starRating} ({item.totalReviews})</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <View style={[styles.statusBadge, 
+          { backgroundColor: item.status === 'Buying' ? '#FF9800' : '#4CAF50' }]}>
+          <Text style={styles.statusText}>{item.status}</Text>
+        </View>
+      </View>
+      
+      {/* Post Title */}
+      {item.title && (
+        <Text style={styles.postTitle}>{item.title}</Text>
+      )}
+      
+      <Text style={styles.postContent}>{item.content}</Text>
+      
+      {/* Post Images */}
+      {item.images && item.images.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.postImagesContainer}>
+          {item.images.map((imageUri, index) => (
+            <Image key={index} source={{ uri: imageUri }} style={styles.postImage} />
+          ))}
+        </ScrollView>
+      )}
+      
+      <View style={styles.postFooter}>
+        <Text style={styles.timestamp}>{item.timestamp}</Text>
+      </View>
+      
+      <View style={styles.postActions}>
+        <TouchableOpacity style={styles.actionButton}>
+          <Text style={styles.actionText}>👍</Text>
+          <Text style={styles.actionCount}>{item.reactions}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => {
+            setSelectedPost(item);
+            setShowCommentsModal(true);
+          }}
+        >
+          <Text style={styles.actionText}>💭</Text>
+          <Text style={styles.actionCount}>{item.comments}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => {
+            setSelectedPost(item);
+            setShowLocationModal(true);
+          }}
+        >
+          <Text style={styles.actionText}>📍</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => {
+            if (item.userType === 'Store Owner') {
+              setSelectedPost(item);
+              setShowMessageModal(true);
+            } else {
+              Alert.alert('Not Available', 'You can only message Store Owners.');
+            }
+          }}
+        >
+          <Text style={styles.actionText}>💬</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderBurgerMenuItem = (title: string, onPress: () => void) => (
+    <TouchableOpacity style={styles.burgerMenuItem} onPress={onPress}>
+      <Text style={styles.burgerMenuText}>{title}</Text>
+    </TouchableOpacity>
+  );
+
+  const handleImagePicker = () => {
+    Alert.alert(
+      'Select Image',
+      'Choose an option',
+      [
+        { text: 'Gallery', onPress: () => openImageLibrary() },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const handleCamera = () => {
+    Alert.alert(
+      'Take Photo',
+      'Open camera to take a photo',
+      [
+        { text: 'Open Camera', onPress: () => openCamera() },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const openImageLibrary = () => {
+    const mockImage: ImageData = {
+      uri: 'https://via.placeholder.com/300x200/4CAF50/FFFFFF?text=Sample+Image',
+      type: 'image/jpeg',
+      name: 'sample.jpg'
+    };
+    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+  };
+
+  const openCamera = () => {
+    const mockImage: ImageData = {
+      uri: 'https://via.placeholder.com/300x200/FF9800/FFFFFF?text=Camera+Photo',
+      type: 'image/jpeg',
+      name: 'camera.jpg'
+    };
+    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = [...newPost.images];
+    newImages.splice(index, 1);
+    setNewPost({ ...newPost, images: newImages });
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header - Placeholder */}
+      <View style={styles.headerPlaceholder}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.headerButton}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Farmer/Supplier</Text>
+        <TouchableOpacity onPress={() => setShowBurgerMenu(true)}>
+          <Text style={styles.headerButton}>☰</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content */}
+      <ScrollView ref={scrollViewRef} style={styles.content}>
+        <View style={styles.welcomeSection}>
+          <TouchableOpacity 
+            style={styles.profileSection} 
+            onPress={() => router.push('/fs-profile')}
+          >
+            <View style={styles.profileIcon}>
+              <Text style={styles.profileIconText}>👤</Text>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{currentUser.userName || currentUser.firstName}</Text>
+              <Text style={styles.roleText}>Farmer/Supplier Dashboard</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchSection}>
+          <View style={styles.searchContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search posts..."
+              placeholderTextColor="#999"
+            />
+          </View>
+        </View>
+
+        <View style={styles.createPostSection}>
+          <TouchableOpacity style={styles.createPostButton} onPress={() => setShowCreatePostModal(true)}>
+            <Text style={styles.createPostIcon}>📝</Text>
+            <Text style={styles.createPostText}>Create New Post</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.postsSection}>
+          <Text style={styles.sectionTitle}>Store Owner Posts</Text>
+          <FlatList
+            data={buyingPosts}
+            renderItem={renderPost}
+            keyExtractor={(item) => item.id.toString()}
+            scrollEnabled={false}
+          />
+        </View>
+      </ScrollView>
+
+      {/* Footer Navigation */}
+      <FS_Footer 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        navigation={footerNavigation}
+        currentUser={currentUser}
+        currentScreen="FarmerSupplierHome"
+        scrollViewRef={scrollViewRef}
+      />
+
+      {/* Burger Menu Modal */}
+      <Modal
+        visible={showBurgerMenu}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowBurgerMenu(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowBurgerMenu(false)}
+        >
+          <View style={styles.burgerMenu}>
+            <View style={styles.burgerMenuHeader}>
+              <Text style={styles.burgerMenuTitle}>Menu</Text>
+              <TouchableOpacity onPress={() => setShowBurgerMenu(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {renderBurgerMenuItem('🏠 Home', () => {
+              setShowBurgerMenu(false);
+            })}
+            
+            {renderBurgerMenuItem('⚙️ Settings', () => {
+              setShowBurgerMenu(false);
+              Alert.alert('Settings', 'Settings feature coming soon!');
+            })}
+            
+            {renderBurgerMenuItem('👤 Profile Settings', () => {
+              setShowBurgerMenu(false);
+              navigation.navigate('FS_ProfileSettings');
+            })}
+            
+            {renderBurgerMenuItem('🚪 Logout', () => {
+              setShowBurgerMenu(false);
+              handleLogout();
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+       {/* Create Post Modal */}
+       <Modal
+         visible={showCreatePostModal}
+         transparent={true}
+         animationType="slide"
+         onRequestClose={() => setShowCreatePostModal(false)}
+       >
+         <View style={styles.modalOverlay}>
+           <ScrollView contentContainerStyle={styles.modalScrollContainer}>
+             <View style={styles.createPostModal}>
+             <View style={styles.modalHeader}>
+               <Text style={styles.modalTitle}>Create New Post</Text>
+               <TouchableOpacity onPress={() => setShowCreatePostModal(false)}>
+                 <Text style={styles.closeButton}>✕</Text>
+               </TouchableOpacity>
+             </View>
+             
+             <View style={styles.postForm}>
+               <View style={styles.inputContainer}>
+                 <Text style={styles.formLabel}>Title:</Text>
+                 <TextInput
+                   style={styles.titleInput}
+                   placeholder="Enter post title"
+                   value={newPost.title}
+                   onChangeText={(text) => setNewPost({...newPost, title: text})}
+                 />
+               </View>
+
+               <View style={styles.inputContainer}>
+                 <Text style={styles.formLabel}>Content:</Text>
+                 <TextInput
+                   style={styles.postTextInput}
+                   placeholder="What would you like to share?"
+                   value={newPost.content}
+                   onChangeText={(text) => setNewPost({...newPost, content: text})}
+                   multiline
+                   numberOfLines={4}
+                 />
+               </View>
+
+               <View style={styles.mediaSection}>
+                <Text style={styles.formLabel}>Add Images:</Text>
+                <View style={styles.mediaButtons}>
+                  <TouchableOpacity 
+                    style={styles.mediaButton}
+                    onPress={() => handleImagePicker()}
+                  >
+                    <Text style={styles.mediaButtonText}>📷 Add Photo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.mediaButton}
+                    onPress={() => handleCamera()}
+                  >
+                    <Text style={styles.mediaButtonText}>📸 Take Photo</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {newPost.images.length > 0 && (
+                  <View style={styles.imagePreviewContainer}>
+                    <Text style={styles.previewLabel}>Selected Images:</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {newPost.images.map((image, index) => (
+                        <View key={index} style={styles.imagePreview}>
+                          <Image source={{ uri: image.uri }} style={styles.previewImage} />
+                          <TouchableOpacity 
+                            style={styles.removeImageButton}
+                            onPress={() => removeImage(index)}
+                          >
+                            <Text style={styles.removeImageText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.locationSection}>
+                <Text style={styles.formLabel}>Location Sharing:</Text>
+                <TouchableOpacity 
+                  style={styles.locationToggle}
+                  onPress={() => setNewPost({...newPost, shareLocation: !newPost.shareLocation})}
+                >
+                  <View style={[styles.toggleSwitch, newPost.shareLocation && styles.toggleSwitchActive]}>
+                    <View style={[styles.toggleCircle, newPost.shareLocation && styles.toggleCircleActive]} />
+                  </View>
+                  <Text style={styles.locationToggleText}>
+                    {newPost.shareLocation ? '📍 Share my location' : '🔒 Keep location private'}
+                  </Text>
+                </TouchableOpacity>
+                {newPost.shareLocation && (
+                  <Text style={styles.locationHint}>Your farm location will be visible to potential buyers</Text>
+                )}
+              </View>
+
+               <TouchableOpacity 
+                 style={styles.submitButton}
+                 onPress={() => {
+                  if (newPost.content.trim()) {
+                    const locationText = newPost.shareLocation ? ' with location' : '';
+                    Alert.alert('Success', `Post created successfully${locationText}!` );
+                    setNewPost({title: '', content: '', status: 'Selling', images: [], shareLocation: false});
+                    setShowCreatePostModal(false);
+                  } else {
+                    Alert.alert('Error', 'Please enter post content');
+                  }
+                }}
+               >
+                 <Text style={styles.submitButtonText}>Create Post</Text>
+               </TouchableOpacity>
+             </View>
+             </View>
+           </ScrollView>
+         </View>
+       </Modal>
+
+      {/* Comments Modal */}
+      <Modal
+        visible={showCommentsModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCommentsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.commentsModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Comments</Text>
+              <TouchableOpacity onPress={() => setShowCommentsModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Post Preview */}
+            {selectedPost && (
+              <View style={styles.postPreview}>
+                <View style={styles.postPreviewHeader}>
+                  <Text style={styles.postPreviewAuthor}>{selectedPost.storeName || selectedPost.author}</Text>
+                  <Text style={styles.postPreviewTime}>{selectedPost.timestamp}</Text>
+                </View>
+                <Text style={styles.postPreviewContent} numberOfLines={2}>
+                  {selectedPost.content}
+                </Text>
+                <TouchableOpacity style={styles.replyButton}>
+                  <Text style={styles.replyButtonText}>Reply</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            <ScrollView style={styles.commentsContainer}>
+              <View style={styles.commentItem}>
+                <View style={styles.commentHeader}>
+                  <Text style={styles.commentAuthor}>Maria Santos</Text>
+                  <Text style={styles.commentTime}>30 min</Text>
+                </View>
+                <Text style={styles.commentText}>Great quality product! Will definitely order again.</Text>
+                <View style={styles.commentImagesContainer}>
+                  <TouchableOpacity onPress={() => setZoomedImage('https://via.placeholder.com/400x300/4CAF50/FFFFFF?text=Product+Image')}>
+                    <Image 
+                      source={{ uri: 'https://via.placeholder.com/400x300/4CAF50/FFFFFF?text=Product+Image' }} 
+                      style={styles.commentImage} 
+                    />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={styles.replyButton}>
+                  <Text style={styles.replyButtonText}>Reply</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+            
+            <View style={styles.commentInputSection}>
+              {commentImages.length > 0 && (
+                <View style={styles.commentImagePreviewContainer}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {commentImages.map((img, index) => (
+                      <View key={index} style={styles.commentImagePreview}>
+                        <Image source={{ uri: img.uri }} style={styles.commentPreviewImage} />
+                        <TouchableOpacity 
+                          style={styles.removeCommentImageButton}
+                          onPress={() => setCommentImages(commentImages.filter((_, i) => i !== index))}
+                        >
+                          <Text style={styles.removeCommentImageText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              
+              <View style={styles.commentInputContainer}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Write a comment..."
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  multiline
+                  maxLength={500}
+                />
+              </View>
+              
+              <View style={styles.commentActionsRow}>
+                <TouchableOpacity 
+                  style={styles.commentActionButton}
+                  onPress={() => {
+                    const mockImage: ImageData = {
+                      uri: 'https://via.placeholder.com/400x300/FF9800/FFFFFF?text=Comment+Image',
+                      type: 'image/jpeg',
+                      name: 'comment.jpg'
+                    };
+                    setCommentImages([...commentImages, mockImage]);
+                  }}
+                >
+                  <Text style={styles.commentActionIcon}>📷</Text>
+                  <Text style={styles.commentActionText}>Photo</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.sendCommentButton, (!newComment.trim() && commentImages.length === 0) && styles.sendCommentButtonDisabled]}
+                  onPress={() => {
+                    if (newComment.trim() || commentImages.length > 0) {
+                      Alert.alert('Success', 'Comment posted!');
+                      setNewComment('');
+                      setCommentImages([]);
+                    }
+                  }}
+                  disabled={!newComment.trim() && commentImages.length === 0}
+                >
+                  <Text style={styles.sendButtonText}>Send</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Image Zoom Modal */}
+      <Modal
+        visible={zoomedImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setZoomedImage(null)}
+      >
+        <TouchableOpacity 
+          style={styles.zoomModalOverlay}
+          activeOpacity={1}
+          onPress={() => setZoomedImage(null)}
+        >
+          <View style={styles.zoomContainer}>
+            {zoomedImage && (
+              <Image 
+                source={{ uri: zoomedImage }} 
+                style={styles.zoomedImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Location Modal */}
+      <Modal
+        visible={showLocationModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.locationModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Location</Text>
+              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.mapContainer}>
+              <Text style={styles.mapPlaceholder}>📍 {selectedPost?.userType === 'Store Owner' ? 'Store' : 'User'} Location</Text>
+              <View style={styles.mapFrame}>
+                <Text style={styles.mapText}>Google Maps Embed</Text>
+                <Text style={styles.mapAddress}>Davao City, Philippines</Text>
+                <Text style={styles.mapCoords}>7.0731° N, 125.6128° E</Text>
+              </View>
+              
+              <TouchableOpacity style={styles.directionsButton}>
+                <Text style={styles.directionsText}>🧭 Get Directions</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Message Modal */}
+      <Modal
+        visible={showMessageModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMessageModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.messageModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Message {selectedPost?.storeName || selectedPost?.author}</Text>
+              <TouchableOpacity onPress={() => setShowMessageModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.messagesContainer}>
+              <View style={styles.messageItem}>
+                <Text style={styles.messageAuthor}>You</Text>
+                <Text style={styles.messageText}>Hello! I have fresh produce available for your store.</Text>
+                <Text style={styles.messageTime}>1:45 PM</Text>
+              </View>
+              
+              <View style={[styles.messageItem, styles.receivedMessage]}>
+                <Text style={styles.messageAuthor}>{selectedPost?.storeName || selectedPost?.author}</Text>
+                <Text style={styles.messageText}>Great! What products do you have and what are your prices?</Text>
+                <Text style={styles.messageTime}>1:50 PM</Text>
+              </View>
+            </ScrollView>
+            
+            <View style={styles.messageInputContainer}>
+              <TextInput
+                style={styles.messageInput}
+                placeholder="Type your message..."
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+              />
+              <TouchableOpacity 
+                style={styles.sendMessageButton}
+                onPress={() => {
+                  if (newMessage.trim()) {
+                    Alert.alert('Success', 'Message sent!');
+                    setNewMessage('');
+                  }
+                }}
+              >
+                <Text style={styles.sendButtonText}>Send</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  content: {
+    flex: 1,
+  },
+  headerPlaceholder: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 50, // Extra padding for status bar
+    backgroundColor: '#4CAF50',
+  },
+  headerButton: {
+    fontSize: 24,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  headerTitle: {
+    fontSize: 18,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  footerPlaceholder: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  footerButton: {
+    padding: 10,
+  },
+  footerButtonText: {
+    fontSize: 24,
+  },
+  welcomeSection: {
+    padding: 20,
+    backgroundColor: 'white',
+    marginBottom: 10,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 15,
+  },
+  profileIconText: {
+    fontSize: 24,
+    color: 'white',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  roleText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 10,
+    color: '#666',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  createPostSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  createPostButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  createPostIcon: {
+    fontSize: 18,
+    marginRight: 8,
+    color: 'white',
+  },
+  createPostText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  postsSection: {
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  postContainer: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  profilePicture: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  profilePictureText: {
+    fontSize: 18,
+    color: 'white',
+  },
+  authorInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  authorName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  userType: {
+    fontSize: 14,
+    color: '#666',
+  },
+  storeName: {
+    fontSize: 14,
+    color: '#666',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  postTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    lineHeight: 24,
+  },
+  postContent: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  postFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#999',
+  },
+  postActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 10,
+  },
+  actionButton: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  actionText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  actionCount: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalScrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100%',
+  },
+  burgerMenu: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 280,
+    height: '100%',
+    backgroundColor: 'white',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  burgerMenuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  burgerMenuTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    fontSize: 24,
+    color: '#666',
+  },
+  burgerMenuItem: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  burgerMenuText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  createPostModal: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  postForm: {
+    width: '100%',
+  },
+  imagePreviewContainer: {
+    marginTop: 15,
+  },
+  previewLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  imagePreview: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  previewImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#FF4444',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeImageText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statusSelector: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
+  },
+  statusButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statusButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  activeStatusButton: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  statusButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeStatusButtonText: {
+    color: 'white',
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  titleInput: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    height: 50,
+  },
+  postTextInput: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  mediaSection: {
+    marginBottom: 20,
+  },
+  mediaButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  mediaButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    marginHorizontal: 5,
+  },
+  mediaButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  submitButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginRight: 5,
+  },
+  star: {
+    fontSize: 16,
+  },
+  filledStar: {
+    color: '#FFD700',
+  },
+  emptyStar: {
+    color: '#E0E0E0',
+  },
+  ratingText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  commentsModal: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  postPreview: {
+    backgroundColor: '#F5F5F5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  postPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  postPreviewAuthor: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  postPreviewTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  postPreviewContent: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  commentsContainer: {
+    maxHeight: 300,
+    marginBottom: 15,
+  },
+  commentItem: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  commentAuthor: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  commentTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  commentText: {
+    fontSize: 15,
+    color: '#333',
+    lineHeight: 22,
+  },
+  commentImagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+    gap: 8,
+  },
+  commentImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  replyButton: {
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  replyButtonText: {
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  commentInputSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 15,
+  },
+  commentImagePreviewContainer: {
+    marginBottom: 10,
+  },
+  commentImagePreview: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  commentPreviewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  removeCommentImageButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF4444',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeCommentImageText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  commentInputContainer: {
+    marginBottom: 10,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    fontSize: 15,
+    maxHeight: 100,
+    backgroundColor: '#F5F5F5',
+  },
+  commentActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  commentActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+    gap: 6,
+  },
+  commentActionIcon: {
+    fontSize: 18,
+  },
+  commentActionText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  sendCommentButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  sendCommentButtonDisabled: {
+    backgroundColor: '#CCC',
+  },
+  sendButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  zoomModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomContainer: {
+    width: '90%',
+    height: '70%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  locationModal: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '90%',
+    maxHeight: '70%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  mapContainer: {
+    alignItems: 'center',
+  },
+  mapPlaceholder: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  mapFrame: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#e8f5e8',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  mapText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 5,
+  },
+  mapAddress: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 3,
+  },
+  mapCoords: {
+    fontSize: 12,
+    color: '#999',
+  },
+  directionsButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  directionsText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  messageModal: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  messagesContainer: {
+    maxHeight: 300,
+    marginBottom: 15,
+  },
+  messageItem: {
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    borderRadius: 15,
+    marginBottom: 10,
+    alignSelf: 'flex-end',
+    maxWidth: '80%',
+  },
+  receivedMessage: {
+    backgroundColor: '#f5f5f5',
+    alignSelf: 'flex-start',
+  },
+  messageAuthor: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 3,
+  },
+  messageText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 18,
+    marginBottom: 3,
+  },
+  messageTime: {
+    fontSize: 10,
+    color: '#999',
+    alignSelf: 'flex-end',
+  },
+  messageInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 15,
+  },
+  messageInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginRight: 10,
+    maxHeight: 80,
+  },
+  sendMessageButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  locationSection: {
+    marginBottom: 20,
+  },
+  locationToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ddd',
+    marginRight: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleSwitchActive: {
+    backgroundColor: '#4CAF50',
+  },
+  toggleCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'white',
+    alignSelf: 'flex-start',
+  },
+  toggleCircleActive: {
+    alignSelf: 'flex-end',
+  },
+  locationToggleText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  locationHint: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 5,
+    marginLeft: 62,
+  },
+  postImagesContainer: {
+    marginVertical: 10,
+  },
+  postImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: '#f0f0f0',
+  },
+});
+
+export default FS_HomeScreen;
