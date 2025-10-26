@@ -1,20 +1,24 @@
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Modal,
-  Alert,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
+import { saveCurrentUser, saveUser, UserData } from '../Database/UserData';
 import UserConsentAndTerms from './UserConsent&TermsOfAgreement';
-import { saveUser, saveCurrentUser, UserData } from '../Database/UserData';
+// import { collection, addDoc } from "firebase/firestore"; 
+import { USER_ROLES } from '@/constants/user_roles';
+import { db } from '@/firebaseConfig'; // Import your initialized db 
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
-type UserRole = 'Farmer/Supplier' | 'StoreOwner' | 'Consumer' | null;
+type UserRole = 'supplier' | 'store_owner' | 'consumer' | null;
 
 interface DocumentImages {
   psaBiodata: string | null;
@@ -82,14 +86,14 @@ export default function RegistrationScreen() {
     }
 
     // Role-specific validation (documents are now optional for testing)
-    if (selectedRole === 'Farmer/Supplier') {
+    if (selectedRole === 'supplier') {
       if (!farmLocation) {
         Alert.alert('Error', 'Please enter your farm location');
         return;
       }
     }
 
-    if (selectedRole === 'StoreOwner') {
+    if (selectedRole === 'store_owner') {
       if (!storeName || !storeLocation) {
         Alert.alert('Error', 'Please enter store name and location');
         return;
@@ -104,6 +108,7 @@ export default function RegistrationScreen() {
     setShowConsentModal(false);
     
     try {
+
       // Prepare user data based on role
       const userData: UserData = {
         email,
@@ -113,17 +118,17 @@ export default function RegistrationScreen() {
         lastName,
         userName,
         phoneNumber,
-        role: selectedRole === 'StoreOwner' ? 'Store Owner' : selectedRole || 'Consumer',
+        role: selectedRole as string,
       };
 
       // Add role-specific fields
-      if (selectedRole === 'Farmer/Supplier') {
+      if (selectedRole === 'supplier') {
         userData.farmLocation = farmLocation;
         userData.documents = {
           psaBiodata: documents.psaBiodata || undefined,
           validId: documents.validId || undefined,
         };
-      } else if (selectedRole === 'StoreOwner') {
+      } else if (selectedRole === 'store_owner') {
         userData.storeName = storeName;
         userData.storeLocation = storeLocation;
         userData.documents = {
@@ -133,9 +138,48 @@ export default function RegistrationScreen() {
         };
       }
 
+      const userHomeRoute = userData.role === 'supplier' ? '/farmer-home' :
+        userData.role === 'store_owner' ? '/store-owner-home' :
+        userData.role === 'consumer' ? '/consumer-home' :
+        '/(tabs)/index'
+      ;
+
       // Save user to storage
       const saved = await saveUser(userData);
       
+      // Check if user email address exists in firestore
+      const docRef = doc(db, "users", email);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        console.log('Error', 'An account with this email already exists');
+        
+        Alert.alert('Error', 'An account with this email already exists.');
+        return;
+      } else {
+        setDoc(doc(db, "users", email), {
+          userName: userData.userName,
+          email: userData.email,
+          password: userData.password,
+          firstName: userData.firstName,
+          middleName: userData.middleName,
+          lastName: userData.lastName,
+          phoneNumber: userData.phoneNumber,
+          role: userData.role,
+        }).then((data) => { 
+          console.log('User added to Firestore with newUser data:', data);
+
+          setDoc(doc(db, userData.role, email), {
+            name: selectedRole === 'store_owner' ? userData.storeName : userData.firstName + ' ' + userData.lastName,
+            id: email, 
+          }).then((role) => {
+            console.log('role added to Firestore with role data:', role);
+            router.replace(userHomeRoute as any);
+          });
+        }).catch((error) => {
+          console.error('Error adding user to Firestore:', error);
+        });
+      }
+
       if (saved) {
         // Set as current user
         await saveCurrentUser(userData);
@@ -145,9 +189,7 @@ export default function RegistrationScreen() {
           {
             text: 'OK',
             onPress: () => {
-              // Navigate back to login screen
-              // User can now login with their credentials
-              router.replace('/');
+              router.replace(userHomeRoute as any);
             }
           }
         ]);
@@ -178,21 +220,21 @@ export default function RegistrationScreen() {
 
           <TouchableOpacity
             style={styles.roleOption}
-            onPress={() => handleRoleSelect('Farmer/Supplier')}
+            onPress={() => handleRoleSelect('supplier')}
           >
             <Text style={styles.roleOptionText}>🌾 Farmer/Supplier</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.roleOption}
-            onPress={() => handleRoleSelect('StoreOwner')}
+            onPress={() => handleRoleSelect('store_owner')}
           >
             <Text style={styles.roleOptionText}>🏪 Store Owner</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.roleOption}
-            onPress={() => handleRoleSelect('Consumer')}
+            onPress={() => handleRoleSelect('consumer')}
           >
             <Text style={styles.roleOptionText}>🛒 Consumer</Text>
           </TouchableOpacity>
@@ -237,7 +279,7 @@ export default function RegistrationScreen() {
           onPress={() => setShowRoleModal(true)}
         >
           <Text style={selectedRole ? styles.roleSelectorText : styles.roleSelectorPlaceholder}>
-            {selectedRole || 'Choose your role'}
+            {USER_ROLES[selectedRole as keyof typeof USER_ROLES] || 'Choose your role'}
           </Text>
           <Text style={styles.dropdownIcon}>▼</Text>
         </TouchableOpacity>
@@ -288,7 +330,7 @@ export default function RegistrationScreen() {
           </View>
 
           {/* Role-Specific Fields */}
-          {selectedRole === 'Farmer/Supplier' && (
+          {selectedRole === 'supplier' && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Farm Location *</Text>
               <TextInput
@@ -300,7 +342,7 @@ export default function RegistrationScreen() {
             </View>
           )}
 
-          {selectedRole === 'StoreOwner' && (
+          {selectedRole === 'store_owner' && (
             <>
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Store Name *</Text>
@@ -371,7 +413,7 @@ export default function RegistrationScreen() {
           </View>
 
           {/* Document Verification Section (Optional for Testing) */}
-          {selectedRole !== 'Consumer' && (
+          {selectedRole !== 'consumer' && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Document Verification (Optional)</Text>
 
@@ -399,7 +441,7 @@ export default function RegistrationScreen() {
                 </TouchableOpacity>
               </View>
 
-              {selectedRole === 'StoreOwner' && (
+              {selectedRole === 'store_owner' && (
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Business Permit (Optional)</Text>
                   <TouchableOpacity
@@ -635,3 +677,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+
+
+
+
+// // Assuming Firebase is initialized and 'storage' is a reference to Firebase Storage
+// import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+
+// const uploadFile = (file) => {
+//   const storageRef = ref(storage, `files/${file.name}`); // Create a reference to the file's location
+//   const uploadTask = uploadBytesResumable(storageRef, file); // Start the upload
+
+//   uploadTask.on('state_changed',
+//     (snapshot) => {
+//       // Monitor upload progress
+//       const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+//       console.log('Upload is ' + progress + '% done');
+//     },
+//     (error) => {
+//       // Handle unsuccessful uploads
+//       console.error("Upload failed:", error);
+//     },
+//     () => {
+//       // Handle successful uploads on complete
+//       getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+//         console.log('File available at', downloadURL);
+//         // Store downloadURL in your database or use it to display the file
+//       });
+//     }
+//   );
+// };
+
+// Example usage (e.g., when a file input changes)
+// const fileInput = document.getElementById('fileInput');
+// fileInput.addEventListener('change', (e) => {
+//   const file = e.target.files[0];
+//   if (file) {
+//     uploadFile(file);
+//   }
+// });

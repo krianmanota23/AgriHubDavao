@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
+import { doc, getDoc } from "firebase/firestore";
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { findUserByEmail, saveCurrentUser } from '../Database/UserData';
 
 export default function LoginScreen() {
@@ -9,6 +11,8 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  // console.log(USER_ROLES.consumer);
+  
   const handleLogin = async () => {
     // Validation
     if (!email || !password) {
@@ -19,6 +23,35 @@ export default function LoginScreen() {
     setIsLoading(true);
     
     try {
+
+
+      const docRef = doc(db, "users", email.trim());
+      getDoc(docRef).then((docSnap) => {
+        if (docSnap.exists()) {
+          // Document exists, access its data
+          console.log("Document data:", docSnap.data());
+          // You can also access the document ID
+          console.log("Document ID:", docSnap.id);
+          if(docSnap.data().password !== password) {
+            Alert.alert('Login Failed', 'Incorrect password');
+            setIsLoading(false);
+            console.log('password mismatched!');
+            
+            return;
+          } else {
+            router.replace('/store-owner-home');
+          }
+        } else {
+          // Document does not exist
+          console.log("No such document!");
+        }
+      })
+      .catch((error) => {
+        // Handle any errors during the fetch operation
+        console.error("Error getting document:", error);
+      });
+
+
       // Find user by email
       const user = await findUserByEmail(email.trim());
       
@@ -39,14 +72,14 @@ export default function LoginScreen() {
       await saveCurrentUser(user);
 
       // Navigate based on user role
-      let routePath = '/(tabs)'; // default fallback
+      let routePath: "/farmer-home" | "/store-owner-home" | "/consumer-home" | "/(tabs)/index" = "/(tabs)/index"; // default fallback
       
       if (user.role === 'Farmer/Supplier') {
-        routePath = '/farmer-home';
+        routePath = "/farmer-home";
       } else if (user.role === 'Store Owner') {
-        routePath = '/store-owner-home';
+        routePath = "/store-owner-home";
       } else if (user.role === 'Consumer') {
-        routePath = '/consumer-home';
+        routePath = "/consumer-home";
       }
 
       // Navigate to the appropriate home screen

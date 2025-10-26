@@ -1,24 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 import { useRouter } from 'expo-router';
-import StoreO_Footer from '../../../components/navigation-components/StoreO_Footer';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
   Alert,
-  ScrollView,
-  FlatList,
-  Modal,
-  TextInput,
-  Image,
   Animated,
   Easing,
-  StatusBar,
+  FlatList,
+  Image,
+  Modal,
   Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import StoreO_Footer from '../../../components/navigation-components/StoreO_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 
 // Types and Interfaces
 interface ImageData {
@@ -60,7 +60,12 @@ interface StoreOwnerHomeScreenProps {
 }
 
 const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigation }) => {
+
+  console.log('navigation', navigation);
+  
+
   const router = useRouter();
+  // router.replace('/store-owner-home');
   const { user } = route.params;
   const [currentUser, setCurrentUser] = useState<UserData>(user);
   const [showBurgerMenu, setShowBurgerMenu] = useState<boolean>(false);
@@ -104,7 +109,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       }
     });
     return unsubscribe;
-  }, [navigation]);
+  });
 
   // Create a navigation adapter for the footer component
   const footerNavigation = {
@@ -208,7 +213,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
           text: 'Logout', 
           onPress: async () => {
             await clearCurrentUser();
-            navigation.navigate('Login');
+            router.replace('/login');
           }
         }
       ]
@@ -396,7 +401,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       {/* Header */}
       <View style={styles.headerPlaceholder}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.headerButton}>←</Text>
+          <Text style={styles.headerButton}></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>AgriHub Davao</Text>
         <TouchableOpacity onPress={() => openBurgerMenu()}>

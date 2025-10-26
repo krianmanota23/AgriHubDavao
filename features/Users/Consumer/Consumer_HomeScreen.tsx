@@ -1,25 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 import { useRouter } from 'expo-router';
-import Consumer_Footer from '../../../components/navigation-components/Consumer_Footer';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
   Alert,
-  ScrollView,
-  FlatList,
-  Modal,
-  TextInput,
-  Image,
   Animated,
   Easing,
-  ImageSourcePropType,
-  StatusBar,
+  FlatList,
+  Image,
+  Modal,
   Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import Consumer_Footer from '../../../components/navigation-components/Consumer_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 // import C_Header from '../components/C_Header';
 // import Footer from '../components/Footer';
 
@@ -182,7 +181,7 @@ const Consumer_HomeScreen: React.FC<ConsumerHomeScreenProps> = ({ route, navigat
           text: 'Logout', 
           onPress: async () => {
             await clearCurrentUser();
-            navigation.navigate('Login');
+            router.replace('/login');
           }
         }
       ]
@@ -373,7 +372,7 @@ const Consumer_HomeScreen: React.FC<ConsumerHomeScreenProps> = ({ route, navigat
       {/* Header - Placeholder until you create C_Header component */}
       <View style={styles.headerPlaceholder}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.headerButton}>←</Text>
+          <Text style={styles.headerButton}></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>AgriHub Davao</Text>
         <TouchableOpacity onPress={() => openBurgerMenu()}>

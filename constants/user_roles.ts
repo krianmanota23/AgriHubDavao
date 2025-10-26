@@ -1,0 +1,1 @@
+export const USER_ROLES = { consumer: 'Consumer' , store_owner: 'Store Owner' , supplier: 'Farmer/Supplier' };

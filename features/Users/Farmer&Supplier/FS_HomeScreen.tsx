@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 import { useRouter } from 'expo-router';
-import FS_Footer from '../../../components/navigation-components/FS_Footer';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
   Alert,
-  ScrollView,
-  Modal,
   FlatList,
-  TextInput,
   Image,
-  StatusBar,
+  Modal,
   Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import FS_Footer from '../../../components/navigation-components/FS_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 // import FS_Header from '../components/FS_Header';
 // import Footer from '../components/Footer';
 
@@ -173,7 +173,7 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
           text: 'Logout', 
           onPress: async () => {
             await clearCurrentUser();
-            navigation.navigate('Login');
+            router.replace('/login');
           }
         }
       ]
@@ -359,7 +359,7 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
       {/* Header - Placeholder */}
       <View style={styles.headerPlaceholder}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.headerButton}>←</Text>
+          <Text style={styles.headerButton}></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Farmer/Supplier</Text>
         <TouchableOpacity onPress={() => setShowBurgerMenu(true)}>
