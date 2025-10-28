@@ -452,7 +452,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
             <Text style={styles.sectionTitle}>
               {selectedFilter === 'All' ? 'All Posts' : `${selectedFilter} Posts`}
             </Text>
-            <Text style={styles.postCount}>({allPosts.length})</Text>
+            <Text style={styles.postCount}>({filteredPosts.length})</Text>
           </View>
           <FlatList
             data={filteredPosts}
