@@ -5,7 +5,6 @@ import {
   FlatList,
   Modal,
   Platform,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Consumer_Footer from '../components/navigation-components/Consumer_Footer';
 import FS_Footer from '../components/navigation-components/FS_Footer';
 import StoreO_Footer from '../components/navigation-components/StoreO_Footer';

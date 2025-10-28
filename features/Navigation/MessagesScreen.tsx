@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  TextInput,
-  Modal,
   Alert,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { getCurrentUser, clearCurrentUser, UserData } from '../Database/UserData';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Consumer_Footer from '../../components/navigation-components/Consumer_Footer';
 import FS_Footer from '../../components/navigation-components/FS_Footer';
 import StoreO_Footer from '../../components/navigation-components/StoreO_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../Database/UserData';
 
 interface Conversation {
   id: number;

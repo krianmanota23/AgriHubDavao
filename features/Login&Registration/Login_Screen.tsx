@@ -10,6 +10,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginText, setLoginText] = useState('Login');
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -20,26 +21,24 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
+    setLoginText('Logging in...');
     
     try {
-
 
       const docRef = doc(db, "users", email.trim());
       getDoc(docRef).then((docSnap) => {
 
         if (docSnap.exists()) {
           // Document exists, access its data
-          console.log("Document data:", docSnap.data());
+          // console.log("Document data:", docSnap.data());
           // You can also access the document ID
-          console.log("Document ID:", docSnap.id);
+          // console.log("Document ID:", docSnap.id);
           if(docSnap.data().password !== password) {
             Alert.alert('Login Failed', 'Incorrect password');
             setIsLoading(false);
-            console.log('password mismatched!');
-            
+            setLoginText('Login');
             return;
           } else {
-            
             // Save current user session
             saveCurrentUser(docSnap.data().email);
             const url = USER_ROLES[docSnap.data().role as keyof typeof USER_ROLES]?.homepage;
@@ -49,6 +48,7 @@ export default function LoginScreen() {
           // Document does not exist
           Alert.alert('Login Failed', 'No account found with this email address');
           setIsLoading(false);
+          setLoginText('Login');
           return;
         }
       })
@@ -58,10 +58,10 @@ export default function LoginScreen() {
       });
       
     } catch (error) {
-      console.error('Login error:', error);
+      // console.error('Login error:', error);
       Alert.alert('Error', 'An error occurred during login. Please try again.');
     } finally {
-      setIsLoading(false);
+      
     }
   };
 
@@ -114,7 +114,7 @@ export default function LoginScreen() {
         disabled={isLoading}
       >
         <Text style={styles.loginButtonText}>
-          {isLoading ? 'Logging in...' : 'Login'}
+          {loginText}
         </Text>
       </TouchableOpacity>
 

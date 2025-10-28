@@ -1,12 +1,12 @@
 import React from 'react';
 import {
-  View,
+  Alert,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserData } from '../Database/UserData';
 
 interface HomeScreenProps {

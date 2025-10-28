@@ -8,7 +8,6 @@ import {
   Image,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -17,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import StoreO_Footer from '../../../components/navigation-components/StoreO_Footer';
 import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 
