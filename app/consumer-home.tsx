@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
 import { getCurrentUser, UserData } from '@/features/Database/UserData';
 import Consumer_HomeScreen from '@/features/Users/Consumer/Consumer_HomeScreen';
+import { useRouter } from 'expo-router';
+import 'expo-router/entry';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 export default function ConsumerHomeRoute() {
   const [user, setUser] = useState<UserData | null>(null);

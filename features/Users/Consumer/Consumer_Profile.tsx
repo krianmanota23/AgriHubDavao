@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
   Alert,
-  ScrollView,
   FlatList,
   Modal,
-  StatusBar,
   Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { getCurrentUser, clearCurrentUser, UserData } from '../../Database/UserData';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Consumer_Footer from '../../../components/navigation-components/Consumer_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 
 interface Post {
   id: number;

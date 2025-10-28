@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { USER_ROLES } from '@/constants/user_roles';
+import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
-import { findUserByEmail, saveCurrentUser } from '../Database/UserData';
+import { doc, getDoc } from "firebase/firestore";
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { saveCurrentUser } from '../Database/UserData';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginText, setLoginText] = useState('Login');
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -17,45 +21,57 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
+    setLoginText('Logging in...');
     
     try {
-      // Find user by email
-      const user = await findUserByEmail(email.trim());
+
+      const docRef = doc(db, "users", email.trim());
+      getDoc(docRef).then((docSnap) => {
+
+        if (docSnap.exists()) {
+          // Document exists, access its data
+          // console.log("Document data:", docSnap.data());
+          // You can also access the document ID
+          // console.log("Document ID:", docSnap.id);
+          if(docSnap.data().password !== password) {
+            Alert.alert('Login Failed', 'Incorrect password');
+            setIsLoading(false);
+            setLoginText('Login');
+            return;
+          } else {
+            // Save current user session
+            const data = docSnap.data();
+            saveCurrentUser({
+              userName: data.userName,
+              email: data.email,
+              password: data.password,
+              firstName: data.firstName,
+              middleName: data.middleName,
+              lastName: data.lastName,
+              phoneNumber: data.phoneNumber,
+              role: data.role,
+            });
+            const url = USER_ROLES[docSnap.data().role as keyof typeof USER_ROLES]?.homepage;
+            router.replace(url as any);
+          }
+        } else {
+          // Document does not exist
+          Alert.alert('Login Failed', 'No account found with this email address');
+          setIsLoading(false);
+          setLoginText('Login');
+          return;
+        }
+      })
+      .catch((error) => {
+        // Handle any errors during the fetch operation
+        console.error("Error getting document:", error);
+      });
       
-      if (!user) {
-        Alert.alert('Login Failed', 'No account found with this email address');
-        setIsLoading(false);
-        return;
-      }
-
-      // Check password
-      if (user.password !== password) {
-        Alert.alert('Login Failed', 'Incorrect password');
-        setIsLoading(false);
-        return;
-      }
-
-      // Save current user session
-      await saveCurrentUser(user);
-
-      // Navigate based on user role
-      let routePath = '/(tabs)'; // default fallback
-      
-      if (user.role === 'Farmer/Supplier') {
-        routePath = '/farmer-home';
-      } else if (user.role === 'Store Owner') {
-        routePath = '/store-owner-home';
-      } else if (user.role === 'Consumer') {
-        routePath = '/consumer-home';
-      }
-
-      // Navigate to the appropriate home screen
-      router.replace(routePath as any);
     } catch (error) {
-      console.error('Login error:', error);
+      // console.error('Login error:', error);
       Alert.alert('Error', 'An error occurred during login. Please try again.');
     } finally {
-      setIsLoading(false);
+      
     }
   };
 
@@ -108,7 +124,7 @@ export default function LoginScreen() {
         disabled={isLoading}
       >
         <Text style={styles.loginButtonText}>
-          {isLoading ? 'Logging in...' : 'Login'}
+          {loginText}
         </Text>
       </TouchableOpacity>
 

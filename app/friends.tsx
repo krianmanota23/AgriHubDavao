@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  Alert,
-  Modal,
-  StatusBar,
-  Platform,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getCurrentUser, clearCurrentUser, UserData } from '../features/Database/UserData';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Consumer_Footer from '../components/navigation-components/Consumer_Footer';
 import FS_Footer from '../components/navigation-components/FS_Footer';
 import StoreO_Footer from '../components/navigation-components/StoreO_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../features/Database/UserData';
 
 interface Friend {
   id: number;
@@ -61,7 +61,7 @@ const FriendsScreen: React.FC = () => {
     let mockFriends: Friend[] = [];
     let mockRequests: FriendRequest[] = [];
     
-    if (role === 'Farmer/Supplier') {
+    if (role === 'farmer' || role === 'supplier') {
       mockFriends = [
         {
           id: 1,
@@ -105,7 +105,7 @@ const FriendsScreen: React.FC = () => {
           message: 'Interested in your rice products',
         },
       ];
-    } else if (role === 'Store Owner') {
+    } else if (role === 'store_owner') {
       mockFriends = [
         {
           id: 1,
@@ -157,7 +157,7 @@ const FriendsScreen: React.FC = () => {
           message: 'Wants to follow your store updates',
         },
       ];
-    } else if (role === 'Consumer') {
+    } else if (role === 'consumer') {
       mockFriends = [
         {
           id: 1,
@@ -240,7 +240,7 @@ const FriendsScreen: React.FC = () => {
   const navigation = {
     navigate: (screen: string, params?: any) => {
       if (screen === 'FarmerSupplierHome') {
-        router.push('/farmer-home');
+        router.push('/supplier-home');
       } else if (screen === 'StoreOwnerHome') {
         router.push('/store-owner-home');
       } else if (screen === 'ConsumerHome') {
@@ -356,8 +356,8 @@ const FriendsScreen: React.FC = () => {
 
   const renderFooter = () => {
     if (!currentUser) return null;
-    
-    if (currentUser.role === 'Consumer') {
+
+    if (currentUser.role === 'consumer') {
       return (
         <Consumer_Footer 
           activeTab={activeTab} 
@@ -367,7 +367,7 @@ const FriendsScreen: React.FC = () => {
           currentScreen="FriendsScreen"
         />
       );
-    } else if (currentUser.role === 'Farmer/Supplier') {
+    } else if (currentUser.role === 'farmer' || currentUser.role === 'supplier') {
       return (
         <FS_Footer 
           activeTab={activeTab} 
@@ -377,7 +377,7 @@ const FriendsScreen: React.FC = () => {
           currentScreen="FriendsScreen"
         />
       );
-    } else if (currentUser.role === 'Store Owner') {
+    } else if (currentUser.role === 'store_owner') {
       return (
         <StoreO_Footer 
           activeTab={activeTab} 
@@ -470,22 +470,22 @@ const FriendsScreen: React.FC = () => {
             
             {renderBurgerMenuItem('🏠 Home', () => {
               setShowBurgerMenu(false);
-              if (currentUser?.role === 'Farmer/Supplier') {
-                router.push('/farmer-home');
-              } else if (currentUser?.role === 'Store Owner') {
+              if (currentUser?.role === 'farmer' || currentUser?.role === 'supplier') {
+                router.push('/supplier-home');
+              } else if (currentUser?.role === 'store_owner') {
                 router.push('/store-owner-home');
-              } else if (currentUser?.role === 'Consumer') {
+              } else if (currentUser?.role === 'consumer') {
                 router.push('/consumer-home');
               }
             })}
             
             {renderBurgerMenuItem('👤 Profile', () => {
               setShowBurgerMenu(false);
-              if (currentUser?.role === 'Farmer/Supplier') {
+              if (currentUser?.role === 'farmer' || currentUser?.role === 'supplier') {
                 router.push('/fs-profile');
-              } else if (currentUser?.role === 'Store Owner') {
+              } else if (currentUser?.role === 'store_owner') {
                 router.push('/storeo-profile');
-              } else if (currentUser?.role === 'Consumer') {
+              } else if (currentUser?.role === 'consumer') {
                 router.push('/c-profile');
               }
             })}

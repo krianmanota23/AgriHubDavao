@@ -1,22 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
-  ScrollView,
-  FlatList,
-  Modal,
-  TextInput,
-  Image,
-  StatusBar,
-  Platform,
-} from 'react-native';
 import { useRouter } from 'expo-router';
-import { UserData, getCurrentUser, clearCurrentUser } from '../../Database/UserData';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import StoreO_Footer from '../../../components/navigation-components/StoreO_Footer';
+import { UserData, clearCurrentUser, getCurrentUser } from '../../Database/UserData';
 
 interface Product {
   id: number;

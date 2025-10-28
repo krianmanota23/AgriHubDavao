@@ -1,24 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
+import { USER_ROLES } from '@/constants/user_roles';
+import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
-import StoreO_Footer from '../../../components/navigation-components/StoreO_Footer';
+import { addDoc, collection, onSnapshot, query } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
   Alert,
-  ScrollView,
-  FlatList,
-  Modal,
-  TextInput,
-  Image,
   Animated,
   Easing,
-  StatusBar,
+  FlatList,
+  Image,
+  Modal,
   Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import StoreO_Footer from '../../../components/navigation-components/StoreO_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 
 // Types and Interfaces
 interface ImageData {
@@ -28,14 +31,16 @@ interface ImageData {
 }
 
 interface Post {
-  id: number;
+  id: string;
   author: string;
+  userId: string;
   userType: string;
-  title?: string;
+  userRole: 'farmer' | 'supplier' | 'consumer' | 'store_owner';
+  title: string;
   content: string;
-  timestamp: string;
-  reactions: number;
-  comments: number;
+  createdAt: string;
+  reactions?: number;
+  comments?: number;
   images?: string[];
   status: 'Selling' | 'Buying';
   starRating?: number;
@@ -43,11 +48,21 @@ interface Post {
 }
 
 interface NewPost {
+  id: string;
+  author: string;
+  userId: string;
+  userType: string;
+  userRole: 'farmer' | 'supplier' | 'consumer' | 'store_owner';
+  createdAt: string;
   title: string;
   content: string;
   status: 'Selling' | 'Buying';
-  images: ImageData[];
-  shareLocation: boolean;
+  images?: ImageData[];
+  shareLocation?: boolean;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface StoreOwnerHomeScreenProps {
@@ -59,8 +74,10 @@ interface StoreOwnerHomeScreenProps {
   navigation: any;
 }
 
-const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigation }) => {
+export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeScreenProps) {
+
   const router = useRouter();
+  // router.replace('/store-owner-home');
   const { user } = route.params;
   const [currentUser, setCurrentUser] = useState<UserData>(user);
   const [showBurgerMenu, setShowBurgerMenu] = useState<boolean>(false);
@@ -69,6 +86,12 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
   const slideAnim = useRef(new Animated.Value(300)).current;
   const [showCreatePostModal, setShowCreatePostModal] = useState<boolean>(false);
   const [newPost, setNewPost] = useState<NewPost>({
+    id: currentUser.email? currentUser.email : currentUser.id ? String(currentUser.id) : '',
+    author: currentUser.userName || '',
+    userId: currentUser.id ? String(currentUser.id) : '',
+    userType: USER_ROLES[currentUser.role as keyof typeof USER_ROLES].name,
+    userRole: (["farmer", "supplier", "consumer", "store_owner"].includes(currentUser.role) ? currentUser.role : "store_owner") as "farmer" | "supplier" | "consumer" | "store_owner",
+    createdAt: new Date().toISOString(),
     title: '',
     content: '',
     status: 'Selling',
@@ -85,15 +108,61 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
   const [commentImages, setCommentImages] = useState<ImageData[]>([]);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState<string>('');
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+
+  const handleCreatePost = async () => {
+    try {
+      const docRef = await addDoc(collection(db, "posts"), { ...newPost });
+    } catch (error) {
+      console.error("Error creating post:", error);
+    } finally {
+      Alert.alert('Success', 'Post created successfully!');
+      setShowCreatePostModal(false);
+    }
+  };
 
   useEffect(() => {
-    const loadCurrentUser = async () => {
-      const userData = await getCurrentUser();
-      if (userData) {
-        setCurrentUser(userData);
-      }
+    const loadPosts = async () => {
+      const q = query(collection(db, "posts"));
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const posts: Post[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+
+          const d = new Date(data.createdAt);
+          const options = {
+              weekday: 'long' as const,
+              year: 'numeric' as const,
+              month: 'long' as const,
+              day: 'numeric' as const,
+              hour: '2-digit' as const,
+              minute: '2-digit' as const,
+          };
+          const time_stamp = d.toLocaleDateString('en-US', options);
+
+          const post: Post = {
+            id: data.id,
+            author: data.author,
+            userId: data.userId,
+            userType: data.userType,
+            userRole: data.userRole,
+            title: data.title,
+            content: data.content,
+            createdAt: time_stamp,
+            reactions: data.reactions,
+            comments: data.comments,
+            images: data.images,
+            status: data.status,
+            starRating: data.starRating,
+            totalReviews: data.totalReviews,
+            // Add other fields if needed
+          }
+          posts.push({...post});
+        });
+        setAllPosts(posts);
+      });
     };
-    loadCurrentUser();
+    loadPosts();
   }, []);
 
   useEffect(() => {
@@ -104,7 +173,8 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       }
     });
     return unsubscribe;
-  }, [navigation]);
+  });
+
 
   // Create a navigation adapter for the footer component
   const footerNavigation = {
@@ -121,56 +191,14 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
     }
   };
 
-  // Mock data for Farmer and Consumer posts
-  const allPostsData: Post[] = [
-    {
-      id: 1,
-      author: 'Francis Manibad',
-      userType: 'Farmer/Supplier',
-      status: 'Selling',
-      title: 'Premium Organic Tomatoes - Bulk Orders Available',
-      content: 'Fresh organic tomatoes available! 50kg ready for harvest. Best quality, competitive price. Contact for bulk orders.',
-      timestamp: '2 hours ago',
-      reactions: 15,
-      comments: 5,
-      starRating: 4.5,
-      totalReviews: 32,
-      images: ['https://via.placeholder.com/300x200/FF5722/FFFFFF?text=Fresh+Tomatoes'],
-    },
-    {
-      id: 2,
-      author: 'Maria Santos',
-      userType: 'Farmer/Supplier',
-      status: 'Selling',
-      title: 'Premium Quality Rice',
-      content: 'Newly harvested and properly dried. Contact me for bulk orders.',
-      timestamp: '5 hours ago',
-      reactions: 28,
-      comments: 12,
-      starRating: 4.8,
-      totalReviews: 45,
-    },
-    {
-      id: 3,
-      author: 'Juan Dela Cruz',
-      userType: 'Consumer',
-      status: 'Buying',
-      title: 'Looking for Fresh Vegetables',
-      content: 'Need fresh vegetables for my restaurant. Looking for reliable supplier.',
-      timestamp: '1 day ago',
-      reactions: 8,
-      comments: 3,
-    },
-  ];
-
   const getFilteredPosts = () => {
     if (selectedFilter === 'All') {
-      return allPostsData;
+      return allPosts;
     }
-    return allPostsData.filter(post => post.userType === selectedFilter);
+    return allPosts.filter(post => post.userType === selectedFilter);
   };
 
-  const allPosts = getFilteredPosts();
+  let filteredPosts = getFilteredPosts();
 
   const openBurgerMenu = () => {
     setShowBurgerMenu(true);
@@ -208,7 +236,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
           text: 'Logout', 
           onPress: async () => {
             await clearCurrentUser();
-            navigation.navigate('Login');
+            router.replace('/login');
           }
         }
       ]
@@ -243,7 +271,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       type: 'image/jpeg',
       name: 'sample.jpg'
     };
-    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+    setNewPost({ ...newPost, images: [...(newPost.images ?? []), mockImage] });
   };
 
   const openCamera = () => {
@@ -252,11 +280,11 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       type: 'image/jpeg',
       name: 'camera.jpg'
     };
-    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+    setNewPost({ ...newPost, images: [...(newPost.images ?? []), mockImage] });
   };
 
   const removeImage = (index: number) => {
-    const newImages = [...newPost.images];
+    const newImages = [...(newPost.images ?? [])];
     newImages.splice(index, 1);
     setNewPost({ ...newPost, images: newImages });
   };
@@ -345,7 +373,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       )}
       
       <View style={styles.postFooter}>
-        <Text style={styles.timestamp}>{item.timestamp}</Text>
+        <Text style={styles.timestamp}>{item.createdAt}</Text>
       </View>
       
       <View style={styles.postActions}>
@@ -396,7 +424,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       {/* Header */}
       <View style={styles.headerPlaceholder}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.headerButton}>←</Text>
+          <Text style={styles.headerButton}></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>AgriHub Davao</Text>
         <TouchableOpacity onPress={() => openBurgerMenu()}>
@@ -451,10 +479,10 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
             <Text style={styles.sectionTitle}>
               {selectedFilter === 'All' ? 'All Posts' : `${selectedFilter} Posts`}
             </Text>
-            <Text style={styles.postCount}>({allPosts.length})</Text>
+            <Text style={styles.postCount}>({filteredPosts.length})</Text>
           </View>
           <FlatList
-            data={allPosts}
+            data={filteredPosts}
             renderItem={renderPost}
             keyExtractor={(item) => item.id.toString()}
             scrollEnabled={false}
@@ -552,7 +580,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
                 style={styles.createPostCloseButton}
                 onPress={() => {
                   setShowCreatePostModal(false);
-                  setNewPost({ title: '', content: '', status: 'Selling', images: [], shareLocation: false });
+                  setNewPost({...newPost});
                 }}
               >
                 <Text style={styles.createPostCloseText}>✕</Text>
@@ -590,6 +618,19 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
                   </TouchableOpacity>
                 </View>
               </View>
+              {/* Title */}
+              <View style={styles.postContentSection}>
+                <Text style={styles.createPostLabel}>Title</Text>
+                <TextInput
+                  style={styles.postTitleInput}
+                  placeholder="Title of your post"
+                  placeholderTextColor="#999"
+                  numberOfLines={1}
+                  value={newPost.title}
+                  onChangeText={(text) => setNewPost({ ...newPost, title: text })}
+                  textAlignVertical="top"
+                />
+              </View>
 
               {/* Content */}
               <View style={styles.postContentSection}>
@@ -616,7 +657,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
                   >
                     <Text style={styles.imagePickerIcon}>🖼️</Text>
                     <Text style={styles.imagePickerCount}>
-                      {newPost.images.length}/3
+                      {(newPost.images?.length ?? 0)}/3
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
@@ -625,15 +666,15 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
                   >
                     <Text style={styles.imagePickerIcon}>📷</Text>
                     <Text style={styles.imagePickerCount}>
-                      {newPost.images.length}/5
+                      {(newPost.images?.length ?? 0)}/5
                     </Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Display Selected Images */}
-                {newPost.images.length > 0 && (
+                {(newPost.images?.length ?? 0) > 0 && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedImagesContainer}>
-                    {newPost.images.map((image, index) => (
+                    {newPost.images?.map((image, index) => (
                       <View key={index} style={styles.selectedImageWrapper}>
                         <Image source={{ uri: image.uri }} style={styles.selectedImage} />
                         <TouchableOpacity 
@@ -656,9 +697,9 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
                     Alert.alert('Error', 'Please enter content for your post');
                     return;
                   }
-                  Alert.alert('Success', 'Post created successfully!');
-                  setShowCreatePostModal(false);
-                  setNewPost({ title: '', content: '', status: 'Selling', images: [], shareLocation: false });
+
+                  handleCreatePost();
+      
                 }}
               >
                 <Text style={styles.createPostSubmitText}>Create Post</Text>
@@ -684,7 +725,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
               <View style={styles.postPreview}>
                 <View style={styles.postPreviewHeader}>
                   <Text style={styles.postPreviewAuthor}>{selectedPost.author}</Text>
-                  <Text style={styles.postPreviewTime}>{selectedPost.timestamp}</Text>
+                  <Text style={styles.postPreviewTime}>{selectedPost.createdAt}</Text>
                 </View>
                 <Text style={styles.postPreviewContent} numberOfLines={2}>
                   {selectedPost.content}
@@ -1272,6 +1313,16 @@ const styles = StyleSheet.create({
     minHeight: 120,
     color: '#333',
   },
+  postTitleInput: {
+    backgroundColor: '#F9F9F9',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    minHeight: 30,
+    color: '#333',
+  },
   addImagesSection: {
     marginBottom: 20,
   },
@@ -1581,5 +1632,3 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
-export default StoreO_HomeScreen;
