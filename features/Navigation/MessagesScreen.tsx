@@ -42,9 +42,12 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
   const [activeTab, setActiveTab] = useState<string>('Messages');
   const [showBurgerMenu, setShowBurgerMenu] = useState<boolean>(false);
 
+  
+
   useEffect(() => {
     const loadCurrentUser = async () => {
       const userData = await getCurrentUser();
+
       if (userData) {
         setCurrentUser(userData);
         loadConversations(userData.role);
@@ -56,7 +59,7 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
   const loadConversations = (role: string) => {
     let mockConversations: Conversation[] = [];
     
-    if (role === 'Farmer/Supplier') {
+    if (role === 'supplier') {
       mockConversations = [
         {
           id: 1,
@@ -86,7 +89,7 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
           avatar: '🏪',
         },
       ];
-    } else if (role === 'Store Owner') {
+    } else if (role === 'store_owner') {
       mockConversations = [
         {
           id: 1,
@@ -116,7 +119,7 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
           avatar: '🌾',
         },
       ];
-    } else if (role === 'Consumer') {
+    } else if (role === 'consumer') {
       mockConversations = [
         {
           id: 1,
@@ -211,7 +214,7 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
   );
 
   const renderFooter = () => {
-    if (userRole === 'Consumer') {
+    if (userRole === 'consumer') {
       return (
         <Consumer_Footer 
           activeTab={activeTab} 
@@ -221,7 +224,7 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
           currentScreen="MessagesScreen"
         />
       );
-    } else if (userRole === 'Farmer/Supplier') {
+    } else if (userRole === 'supplier' || userRole === 'farmer') {
       return (
         <FS_Footer 
           activeTab={activeTab} 
@@ -231,7 +234,7 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
           currentScreen="MessagesScreen"
         />
       );
-    } else if (userRole === 'Store Owner') {
+    } else if (userRole === 'store_owner') {
       return (
         <StoreO_Footer 
           activeTab={activeTab} 
@@ -303,22 +306,22 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ route, navigation }) =>
             
             {renderBurgerMenuItem('🏠 Home', () => {
               setShowBurgerMenu(false);
-              if (userRole === 'Farmer/Supplier') {
+              if (userRole === 'farmer' || userRole === 'supplier') {
                 navigation.navigate('FarmerSupplierHome', { user: currentUser });
-              } else if (userRole === 'Store Owner') {
+              } else if (userRole === 'store_owner') {
                 navigation.navigate('StoreOwnerHome', { user: currentUser });
-              } else if (userRole === 'Consumer') {
+              } else if (userRole === 'consumer') {
                 navigation.navigate('ConsumerHome', { user: currentUser });
               }
             })}
             
             {renderBurgerMenuItem('👤 Profile', () => {
               setShowBurgerMenu(false);
-              if (userRole === 'Farmer/Supplier') {
+              if (userRole === 'farmer' || userRole === 'supplier') {
                 navigation.navigate('FS_Profile', { user: currentUser });
-              } else if (userRole === 'Store Owner') {
+              } else if (userRole === 'store_owner') {
                 navigation.navigate('SO_Profile', { user: currentUser });
-              } else if (userRole === 'Consumer') {
+              } else if (userRole === 'consumer') {
                 navigation.navigate('C_Profile', { user: currentUser });
               }
             })}

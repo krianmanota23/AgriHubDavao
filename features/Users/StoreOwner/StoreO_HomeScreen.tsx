@@ -1,4 +1,6 @@
+import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
+import { collection, onSnapshot, query } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -28,12 +30,14 @@ interface ImageData {
 }
 
 interface Post {
-  id: number;
+  id: string;
   author: string;
+  userId: string;
   userType: string;
-  title?: string;
+  userRole: 'farmer' | 'supplier' | 'consumer' | 'storeOwner';
+  title: string;
   content: string;
-  timestamp: string;
+  createdAt: string;
   reactions: number;
   comments: number;
   images?: string[];
@@ -59,10 +63,7 @@ interface StoreOwnerHomeScreenProps {
   navigation: any;
 }
 
-const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigation }) => {
-
-  console.log('navigation', navigation);
-  
+export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeScreenProps) {
 
   const router = useRouter();
   // router.replace('/store-owner-home');
@@ -90,15 +91,51 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
   const [commentImages, setCommentImages] = useState<ImageData[]>([]);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState<string>('');
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
 
+  
   useEffect(() => {
-    const loadCurrentUser = async () => {
-      const userData = await getCurrentUser();
-      if (userData) {
-        setCurrentUser(userData);
-      }
+    const loadPosts = async () => {
+      const q = query(collection(db, "posts"));
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const posts: Post[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+
+          const d = new Date(data.createdAt);
+          const options = {
+              weekday: 'long' as const,
+              year: 'numeric' as const,
+              month: 'long' as const,
+              day: 'numeric' as const,
+              hour: '2-digit' as const,
+              minute: '2-digit' as const,
+          };
+          const time_stamp = d.toLocaleDateString('en-US', options);
+
+          const post: Post = {
+            id: data.id,
+            author: data.author,
+            userId: data.userId,
+            userType: data.userType,
+            userRole: data.userRole,
+            title: data.title,
+            content: data.content,
+            createdAt: time_stamp,
+            reactions: data.reactions,
+            comments: data.comments,
+            images: data.images,
+            status: data.status,
+            starRating: data.starRating,
+            totalReviews: data.totalReviews,
+            // Add other fields if needed
+          }
+          posts.push({...post});
+        });
+        setAllPosts(posts);
+      });
     };
-    loadCurrentUser();
+    loadPosts();
   }, []);
 
   useEffect(() => {
@@ -110,6 +147,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
     });
     return unsubscribe;
   });
+
 
   // Create a navigation adapter for the footer component
   const footerNavigation = {
@@ -126,56 +164,14 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
     }
   };
 
-  // Mock data for Farmer and Consumer posts
-  const allPostsData: Post[] = [
-    {
-      id: 1,
-      author: 'Francis Manibad',
-      userType: 'Farmer/Supplier',
-      status: 'Selling',
-      title: 'Premium Organic Tomatoes - Bulk Orders Available',
-      content: 'Fresh organic tomatoes available! 50kg ready for harvest. Best quality, competitive price. Contact for bulk orders.',
-      timestamp: '2 hours ago',
-      reactions: 15,
-      comments: 5,
-      starRating: 4.5,
-      totalReviews: 32,
-      images: ['https://via.placeholder.com/300x200/FF5722/FFFFFF?text=Fresh+Tomatoes'],
-    },
-    {
-      id: 2,
-      author: 'Maria Santos',
-      userType: 'Farmer/Supplier',
-      status: 'Selling',
-      title: 'Premium Quality Rice',
-      content: 'Newly harvested and properly dried. Contact me for bulk orders.',
-      timestamp: '5 hours ago',
-      reactions: 28,
-      comments: 12,
-      starRating: 4.8,
-      totalReviews: 45,
-    },
-    {
-      id: 3,
-      author: 'Juan Dela Cruz',
-      userType: 'Consumer',
-      status: 'Buying',
-      title: 'Looking for Fresh Vegetables',
-      content: 'Need fresh vegetables for my restaurant. Looking for reliable supplier.',
-      timestamp: '1 day ago',
-      reactions: 8,
-      comments: 3,
-    },
-  ];
-
   const getFilteredPosts = () => {
     if (selectedFilter === 'All') {
-      return allPostsData;
+      return allPosts;
     }
-    return allPostsData.filter(post => post.userType === selectedFilter);
+    return allPosts.filter(post => post.userType === selectedFilter);
   };
 
-  const allPosts = getFilteredPosts();
+  let filteredPosts = getFilteredPosts();
 
   const openBurgerMenu = () => {
     setShowBurgerMenu(true);
@@ -350,7 +346,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
       )}
       
       <View style={styles.postFooter}>
-        <Text style={styles.timestamp}>{item.timestamp}</Text>
+        <Text style={styles.timestamp}>{item.createdAt}</Text>
       </View>
       
       <View style={styles.postActions}>
@@ -459,7 +455,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
             <Text style={styles.postCount}>({allPosts.length})</Text>
           </View>
           <FlatList
-            data={allPosts}
+            data={filteredPosts}
             renderItem={renderPost}
             keyExtractor={(item) => item.id.toString()}
             scrollEnabled={false}
@@ -689,7 +685,7 @@ const StoreO_HomeScreen: React.FC<StoreOwnerHomeScreenProps> = ({ route, navigat
               <View style={styles.postPreview}>
                 <View style={styles.postPreviewHeader}>
                   <Text style={styles.postPreviewAuthor}>{selectedPost.author}</Text>
-                  <Text style={styles.postPreviewTime}>{selectedPost.timestamp}</Text>
+                  <Text style={styles.postPreviewTime}>{selectedPost.createdAt}</Text>
                 </View>
                 <Text style={styles.postPreviewContent} numberOfLines={2}>
                   {selectedPost.content}
@@ -1586,5 +1582,3 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
-export default StoreO_HomeScreen;
