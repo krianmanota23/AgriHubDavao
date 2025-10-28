@@ -1,6 +1,7 @@
+import { USER_ROLES } from '@/constants/user_roles';
 import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
-import { collection, onSnapshot, query } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, query } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -34,12 +35,12 @@ interface Post {
   author: string;
   userId: string;
   userType: string;
-  userRole: 'farmer' | 'supplier' | 'consumer' | 'storeOwner';
+  userRole: 'farmer' | 'supplier' | 'consumer' | 'store_owner';
   title: string;
   content: string;
   createdAt: string;
-  reactions: number;
-  comments: number;
+  reactions?: number;
+  comments?: number;
   images?: string[];
   status: 'Selling' | 'Buying';
   starRating?: number;
@@ -47,11 +48,21 @@ interface Post {
 }
 
 interface NewPost {
+  id: string;
+  author: string;
+  userId: string;
+  userType: string;
+  userRole: 'farmer' | 'supplier' | 'consumer' | 'store_owner';
+  createdAt: string;
   title: string;
   content: string;
   status: 'Selling' | 'Buying';
-  images: ImageData[];
-  shareLocation: boolean;
+  images?: ImageData[];
+  shareLocation?: boolean;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface StoreOwnerHomeScreenProps {
@@ -75,6 +86,12 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
   const slideAnim = useRef(new Animated.Value(300)).current;
   const [showCreatePostModal, setShowCreatePostModal] = useState<boolean>(false);
   const [newPost, setNewPost] = useState<NewPost>({
+    id: currentUser.email? currentUser.email : currentUser.id ? String(currentUser.id) : '',
+    author: currentUser.userName || '',
+    userId: currentUser.id ? String(currentUser.id) : '',
+    userType: USER_ROLES[currentUser.role as keyof typeof USER_ROLES].name,
+    userRole: (["farmer", "supplier", "consumer", "store_owner"].includes(currentUser.role) ? currentUser.role : "store_owner") as "farmer" | "supplier" | "consumer" | "store_owner",
+    createdAt: new Date().toISOString(),
     title: '',
     content: '',
     status: 'Selling',
@@ -93,7 +110,17 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
   const [newMessage, setNewMessage] = useState<string>('');
   const [allPosts, setAllPosts] = useState<Post[]>([]);
 
-  
+  const handleCreatePost = async () => {
+    try {
+      const docRef = await addDoc(collection(db, "posts"), { ...newPost });
+    } catch (error) {
+      console.error("Error creating post:", error);
+    } finally {
+      Alert.alert('Success', 'Post created successfully!');
+      setShowCreatePostModal(false);
+    }
+  };
+
   useEffect(() => {
     const loadPosts = async () => {
       const q = query(collection(db, "posts"));
@@ -244,7 +271,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
       type: 'image/jpeg',
       name: 'sample.jpg'
     };
-    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+    setNewPost({ ...newPost, images: [...(newPost.images ?? []), mockImage] });
   };
 
   const openCamera = () => {
@@ -253,11 +280,11 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
       type: 'image/jpeg',
       name: 'camera.jpg'
     };
-    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+    setNewPost({ ...newPost, images: [...(newPost.images ?? []), mockImage] });
   };
 
   const removeImage = (index: number) => {
-    const newImages = [...newPost.images];
+    const newImages = [...(newPost.images ?? [])];
     newImages.splice(index, 1);
     setNewPost({ ...newPost, images: newImages });
   };
@@ -553,7 +580,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                 style={styles.createPostCloseButton}
                 onPress={() => {
                   setShowCreatePostModal(false);
-                  setNewPost({ title: '', content: '', status: 'Selling', images: [], shareLocation: false });
+                  setNewPost({...newPost});
                 }}
               >
                 <Text style={styles.createPostCloseText}>✕</Text>
@@ -591,6 +618,19 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                   </TouchableOpacity>
                 </View>
               </View>
+              {/* Title */}
+              <View style={styles.postContentSection}>
+                <Text style={styles.createPostLabel}>Title</Text>
+                <TextInput
+                  style={styles.postTitleInput}
+                  placeholder="Title of your post"
+                  placeholderTextColor="#999"
+                  numberOfLines={1}
+                  value={newPost.title}
+                  onChangeText={(text) => setNewPost({ ...newPost, title: text })}
+                  textAlignVertical="top"
+                />
+              </View>
 
               {/* Content */}
               <View style={styles.postContentSection}>
@@ -617,7 +657,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                   >
                     <Text style={styles.imagePickerIcon}>🖼️</Text>
                     <Text style={styles.imagePickerCount}>
-                      {newPost.images.length}/3
+                      {(newPost.images?.length ?? 0)}/3
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
@@ -626,15 +666,15 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                   >
                     <Text style={styles.imagePickerIcon}>📷</Text>
                     <Text style={styles.imagePickerCount}>
-                      {newPost.images.length}/5
+                      {(newPost.images?.length ?? 0)}/5
                     </Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Display Selected Images */}
-                {newPost.images.length > 0 && (
+                {(newPost.images?.length ?? 0) > 0 && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedImagesContainer}>
-                    {newPost.images.map((image, index) => (
+                    {newPost.images?.map((image, index) => (
                       <View key={index} style={styles.selectedImageWrapper}>
                         <Image source={{ uri: image.uri }} style={styles.selectedImage} />
                         <TouchableOpacity 
@@ -657,9 +697,9 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                     Alert.alert('Error', 'Please enter content for your post');
                     return;
                   }
-                  Alert.alert('Success', 'Post created successfully!');
-                  setShowCreatePostModal(false);
-                  setNewPost({ title: '', content: '', status: 'Selling', images: [], shareLocation: false });
+
+                  handleCreatePost();
+      
                 }}
               >
                 <Text style={styles.createPostSubmitText}>Create Post</Text>
@@ -1271,6 +1311,16 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 16,
     minHeight: 120,
+    color: '#333',
+  },
+  postTitleInput: {
+    backgroundColor: '#F9F9F9',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    minHeight: 30,
     color: '#333',
   },
   addImagesSection: {
