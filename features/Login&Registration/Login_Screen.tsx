@@ -40,7 +40,17 @@ export default function LoginScreen() {
             return;
           } else {
             // Save current user session
-            saveCurrentUser(docSnap.data().email);
+            const data = docSnap.data();
+            saveCurrentUser({
+              userName: data.userName,
+              email: data.email,
+              password: data.password,
+              firstName: data.firstName,
+              middleName: data.middleName,
+              lastName: data.lastName,
+              phoneNumber: data.phoneNumber,
+              role: data.role,
+            });
             const url = USER_ROLES[docSnap.data().role as keyof typeof USER_ROLES]?.homepage;
             router.replace(url as any);
           }
