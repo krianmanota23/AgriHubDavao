@@ -1,19 +1,19 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
-  FlatList,
-  Modal,
-  Alert,
-  Image,
   StatusBar,
-  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { clearCurrentUser } from '../../Database/UserData';
 
 interface StoreOwner {
@@ -353,7 +353,7 @@ const StoreOwnerProfileView: React.FC = () => {
                 if (currentUser?.role === 'Consumer') {
                   router.push('/consumer-home');
                 } else if (currentUser?.role === 'Farmer/Supplier') {
-                  router.push('/farmer-home');
+                  router.push('/supplier-home');
                 } else {
                   router.back();
                 }

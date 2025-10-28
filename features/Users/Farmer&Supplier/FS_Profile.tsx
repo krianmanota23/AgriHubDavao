@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
-  ScrollView,
-  Modal,
-  TextInput,
-  FlatList,
-  StatusBar,
-  Platform,
-} from 'react-native';
 import { useRouter } from 'expo-router';
-import { UserData, getCurrentUser, clearCurrentUser } from '../../Database/UserData';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import FS_Footer from '../../../components/navigation-components/FS_Footer';
+import { UserData, clearCurrentUser, getCurrentUser } from '../../Database/UserData';
 
 // Types and Interfaces
 interface Product {
@@ -64,7 +64,7 @@ const FS_Profile: React.FC = () => {
   const navigation = {
     navigate: (screen: string, params?: any) => {
       if (screen === 'FarmerSupplierHome') {
-        router.push('/farmer-home');
+        router.push('/supplier-home');
       } else if (screen === 'MessagesScreen') {
         router.push('/messages');
       } else if (screen === 'NotificationsScreen') {
@@ -366,7 +366,7 @@ const FS_Profile: React.FC = () => {
             
             {renderBurgerMenuItem('🏠 Home', () => {
               setShowBurgerMenu(false);
-              router.push('/farmer-home');
+              router.push('/supplier-home');
             })}
             
             {renderBurgerMenuItem('⚙️ Settings', () => {

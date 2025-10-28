@@ -1,22 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  TextInput,
-  Modal,
   Alert,
-  StatusBar,
+  FlatList,
+  Modal,
   Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getCurrentUser, clearCurrentUser, UserData } from '../features/Database/UserData';
 import Consumer_Footer from '../components/navigation-components/Consumer_Footer';
 import FS_Footer from '../components/navigation-components/FS_Footer';
 import StoreO_Footer from '../components/navigation-components/StoreO_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../features/Database/UserData';
 
 interface Conversation {
   id: number;
@@ -181,7 +181,7 @@ const MessagesScreen: React.FC = () => {
   const navigation = {
     navigate: (screen: string, params?: any) => {
       if (screen === 'FarmerSupplierHome') {
-        router.push('/farmer-home');
+        router.push('/supplier-home');
       } else if (screen === 'StoreOwnerHome') {
         router.push('/store-owner-home');
       } else if (screen === 'ConsumerHome') {
@@ -352,7 +352,7 @@ const MessagesScreen: React.FC = () => {
             {renderBurgerMenuItem('🏠 Home', () => {
               setShowBurgerMenu(false);
               if (currentUser?.role === 'Farmer/Supplier') {
-                router.push('/farmer-home');
+                router.push('/supplier-home');
               } else if (currentUser?.role === 'Store Owner') {
                 router.push('/store-owner-home');
               } else if (currentUser?.role === 'Consumer') {

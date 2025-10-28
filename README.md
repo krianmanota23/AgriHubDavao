@@ -119,7 +119,7 @@ AgriHubDavao/
 │   │   ├── index.tsx
 │   │   ├── explore.tsx
 │   ├── consumer-home.tsx
-│   ├── farmer-home.tsx
+│   ├── supplier-home.tsx
 │   ├── store-owner-home.tsx
 │   ├── login.tsx
 │   ├── register.tsx
@@ -279,7 +279,7 @@ npm run web
 /login                          # Login screen
 /register                       # Registration screen
 /consumer-home                  # Consumer dashboard
-/farmer-home                    # Farmer/Supplier dashboard
+/supplier-home                    # Farmer/Supplier dashboard
 /store-owner-home              # Store Owner dashboard
 /messages                       # Messages list
 /chat                          # Chat conversation

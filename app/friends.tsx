@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  Alert,
-  Modal,
-  StatusBar,
-  Platform,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getCurrentUser, clearCurrentUser, UserData } from '../features/Database/UserData';
 import Consumer_Footer from '../components/navigation-components/Consumer_Footer';
 import FS_Footer from '../components/navigation-components/FS_Footer';
 import StoreO_Footer from '../components/navigation-components/StoreO_Footer';
+import { clearCurrentUser, getCurrentUser, UserData } from '../features/Database/UserData';
 
 interface Friend {
   id: number;
@@ -240,7 +240,7 @@ const FriendsScreen: React.FC = () => {
   const navigation = {
     navigate: (screen: string, params?: any) => {
       if (screen === 'FarmerSupplierHome') {
-        router.push('/farmer-home');
+        router.push('/supplier-home');
       } else if (screen === 'StoreOwnerHome') {
         router.push('/store-owner-home');
       } else if (screen === 'ConsumerHome') {
@@ -471,7 +471,7 @@ const FriendsScreen: React.FC = () => {
             {renderBurgerMenuItem('🏠 Home', () => {
               setShowBurgerMenu(false);
               if (currentUser?.role === 'Farmer/Supplier') {
-                router.push('/farmer-home');
+                router.push('/supplier-home');
               } else if (currentUser?.role === 'Store Owner') {
                 router.push('/store-owner-home');
               } else if (currentUser?.role === 'Consumer') {

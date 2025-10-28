@@ -1,9 +1,10 @@
+import { USER_ROLES } from '@/constants/user_roles';
 import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
 import { doc, getDoc } from "firebase/firestore";
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { findUserByEmail, saveCurrentUser } from '../Database/UserData';
+import { saveCurrentUser } from '../Database/UserData';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -11,8 +12,6 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // console.log(USER_ROLES.consumer);
-  
   const handleLogin = async () => {
     // Validation
     if (!email || !password) {
@@ -27,6 +26,7 @@ export default function LoginScreen() {
 
       const docRef = doc(db, "users", email.trim());
       getDoc(docRef).then((docSnap) => {
+
         if (docSnap.exists()) {
           // Document exists, access its data
           console.log("Document data:", docSnap.data());
@@ -39,51 +39,24 @@ export default function LoginScreen() {
             
             return;
           } else {
-            router.replace('/store-owner-home');
+            
+            // Save current user session
+            saveCurrentUser(docSnap.data().email);
+            const url = USER_ROLES[docSnap.data().role as keyof typeof USER_ROLES]?.homepage;
+            router.replace(url as any);
           }
         } else {
           // Document does not exist
-          console.log("No such document!");
+          Alert.alert('Login Failed', 'No account found with this email address');
+          setIsLoading(false);
+          return;
         }
       })
       .catch((error) => {
         // Handle any errors during the fetch operation
         console.error("Error getting document:", error);
       });
-
-
-      // Find user by email
-      const user = await findUserByEmail(email.trim());
       
-      if (!user) {
-        Alert.alert('Login Failed', 'No account found with this email address');
-        setIsLoading(false);
-        return;
-      }
-
-      // Check password
-      if (user.password !== password) {
-        Alert.alert('Login Failed', 'Incorrect password');
-        setIsLoading(false);
-        return;
-      }
-
-      // Save current user session
-      await saveCurrentUser(user);
-
-      // Navigate based on user role
-      let routePath: "/farmer-home" | "/store-owner-home" | "/consumer-home" | "/(tabs)/index" = "/(tabs)/index"; // default fallback
-      
-      if (user.role === 'Farmer/Supplier') {
-        routePath = "/farmer-home";
-      } else if (user.role === 'Store Owner') {
-        routePath = "/store-owner-home";
-      } else if (user.role === 'Consumer') {
-        routePath = "/consumer-home";
-      }
-
-      // Navigate to the appropriate home screen
-      router.replace(routePath as any);
     } catch (error) {
       console.error('Login error:', error);
       Alert.alert('Error', 'An error occurred during login. Please try again.');

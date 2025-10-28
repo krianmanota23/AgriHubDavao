@@ -1,1 +1,1 @@
-export const USER_ROLES = { consumer: 'Consumer' , store_owner: 'Store Owner' , supplier: 'Farmer/Supplier' };
+export const USER_ROLES = { consumer: { name: 'Consumer', homepage: '/consumer-home' }, store_owner: { name: 'Store Owner', homepage: '/store-owner-home' }, supplier: { name: 'Farmer/Supplier', homepage: '/supplier-home' } };

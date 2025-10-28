@@ -138,7 +138,7 @@ export default function RegistrationScreen() {
         };
       }
 
-      const userHomeRoute = userData.role === 'supplier' ? '/farmer-home' :
+      const userHomeRoute = userData.role === 'supplier' ? '/supplier-home' :
         userData.role === 'store_owner' ? '/store-owner-home' :
         userData.role === 'consumer' ? '/consumer-home' :
         '/(tabs)/index'
@@ -279,7 +279,7 @@ export default function RegistrationScreen() {
           onPress={() => setShowRoleModal(true)}
         >
           <Text style={selectedRole ? styles.roleSelectorText : styles.roleSelectorPlaceholder}>
-            {USER_ROLES[selectedRole as keyof typeof USER_ROLES] || 'Choose your role'}
+            {USER_ROLES[selectedRole as keyof typeof USER_ROLES]?.name || 'Choose your role'}
           </Text>
           <Text style={styles.dropdownIcon}>▼</Text>
         </TouchableOpacity>
