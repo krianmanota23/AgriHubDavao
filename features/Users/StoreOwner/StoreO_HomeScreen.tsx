@@ -1,4 +1,5 @@
 import { USER_ROLES } from '@/constants/user_roles';
+import { clearCurrentUser, getCurrentUser, UserData } from '@/features/Database/UserData';
 import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
 import { addDoc, collection, onSnapshot, query } from "firebase/firestore";
@@ -21,13 +22,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import StoreO_Footer from '../../../components/navigation-components/StoreO_Footer';
-import { clearCurrentUser, getCurrentUser, UserData } from '../../Database/UserData';
 
 // Types and Interfaces
 interface ImageData {
-  uri: string;
-  type: string;
-  name: string;
+  uri?: string;
+  type?: string;
+  name?: string;
 }
 
 interface Post {
@@ -41,7 +41,7 @@ interface Post {
   createdAt: string;
   reactions?: number;
   comments?: number;
-  images?: string[];
+  images?: Array<ImageData>;
   status: 'Selling' | 'Buying';
   starRating?: number;
   totalReviews?: number;
@@ -295,19 +295,18 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
         <TouchableOpacity 
           style={styles.profilePicture}
           onPress={() => {
-            if (item.userType === 'Farmer/Supplier') {
-              router.push({
-                pathname: '/fs-profile-view',
-                params: {
-                  farmerSupplier: JSON.stringify({
-                    author: item.author,
-                    starRating: item.starRating || 0,
-                    totalReviews: item.totalReviews || 0
-                  }),
-                  currentUser: JSON.stringify(currentUser)
-                }
-              });
-            }
+            const role_item = USER_ROLES[currentUser.role as keyof typeof USER_ROLES].profile_view;
+            router.push({
+              pathname: role_item as any,
+              params: {
+                farmerSupplier: JSON.stringify({
+                  author: item.author,
+                  starRating: item.starRating || 0,
+                  totalReviews: item.totalReviews || 0
+                }),
+                currentUser: JSON.stringify(currentUser)
+              }
+            });
           }}
         >
           <Text style={styles.profilePictureText}>
@@ -317,19 +316,18 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
         <View style={styles.authorInfo}>
           <TouchableOpacity 
             onPress={() => {
-              if (item.userType === 'Farmer/Supplier') {
-                router.push({
-                  pathname: '/fs-profile-view',
-                  params: {
-                    farmerSupplier: JSON.stringify({
-                      author: item.author,
-                      starRating: item.starRating || 0,
-                      totalReviews: item.totalReviews || 0
-                    }),
-                    currentUser: JSON.stringify(currentUser)
-                  }
-                });
-              }
+              const role_item = USER_ROLES[currentUser.role as keyof typeof USER_ROLES].profile_view;
+              router.push({
+                pathname: role_item as any,
+                params: {
+                  farmerSupplier: JSON.stringify({
+                    author: item.author,
+                    starRating: item.starRating || 0,
+                    totalReviews: item.totalReviews || 0
+                  }),
+                  currentUser: JSON.stringify(currentUser)
+                }
+              });
             }}
           >
             <Text style={styles.authorName}>{item.author}</Text>
@@ -367,7 +365,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
       {item.images && item.images.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.postImagesContainer}>
           {item.images.map((imageUri, index) => (
-            <Image key={index} source={{ uri: imageUri }} style={styles.postImage} />
+            <Image key={index} source={{ uri: imageUri.uri as any }} style={styles.postImage} />
           ))}
         </ScrollView>
       )}
@@ -400,15 +398,30 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
         >
           <Text style={styles.actionText}>📍</Text>
         </TouchableOpacity>
+        {item.id !== String(currentUser.email) && (
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => {
-            setSelectedPost(item);
-            setShowMessageModal(true);
+            router.push({
+              pathname: '/chat',
+              params: {
+                conversation: JSON.stringify(
+                  {
+                    id: item.id,
+                    name: item.author,
+                    userType: USER_ROLES[item.userRole as keyof typeof USER_ROLES].name,
+                    lastMessage: '',
+                    timestamp: '',
+                    unreadCount: 0,
+                    avatar: '🏪',
+                  }
+                )
+              }
+              });
           }}
         >
           <Text style={styles.actionText}>💬</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>)}
       </View>
     </View>
   );
@@ -863,9 +876,15 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
         <View style={styles.modalOverlay}>
           <View style={styles.messageModal}>
             <Text style={styles.modalTitle}>Message</Text>
-            <TouchableOpacity onPress={() => setShowMessageModal(false)}>
-              <Text style={styles.closeButton}>Close</Text>
-            </TouchableOpacity>
+            <TextInput style={styles.postContent} placeholder="Type your message..." />
+            <View>
+              <TouchableOpacity onPress={() => setShowMessageModal(false)}>
+                <Text style={styles.closeButton}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => {}}>
+                <Text style={styles.closeButton}>Send</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
