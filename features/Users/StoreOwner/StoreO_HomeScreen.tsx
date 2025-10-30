@@ -2,7 +2,7 @@ import { USER_ROLES } from '@/constants/user_roles';
 import { clearCurrentUser, getCurrentUser, UserData } from '@/features/Database/UserData';
 import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
-import { addDoc, collection, onSnapshot, query } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, query, setDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -86,7 +86,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
   const slideAnim = useRef(new Animated.Value(300)).current;
   const [showCreatePostModal, setShowCreatePostModal] = useState<boolean>(false);
   const [newPost, setNewPost] = useState<NewPost>({
-    id: currentUser.email? currentUser.email : currentUser.id ? String(currentUser.id) : '',
+    id: '',
     author: currentUser.userName || '',
     userId: currentUser.id ? String(currentUser.id) : '',
     userType: USER_ROLES[currentUser.role as keyof typeof USER_ROLES].name,
@@ -109,18 +109,45 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState<string>('');
   const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [isCreatingPost, setisCreatingPost] = useState<boolean>(false);
+  const [createPostText, setCreatePostText] = useState<String>('Create Post');
 
   const handleCreatePost = async () => {
     try {
-      const docRef = await addDoc(collection(db, "posts"), { ...newPost });
+
+      setisCreatingPost(true);
+      setCreatePostText('Creating Post...');
+
+      addDoc(collection(db, "posts"), newPost).then((postRef) => {
+
+        const updatePostRef = doc(db, "posts", postRef.id);
+
+        setDoc(updatePostRef, { id: postRef.id }, { merge: true });
+
+      });
+
     } catch (error) {
       console.error("Error creating post:", error);
     } finally {
-      Alert.alert('Success', 'Post created successfully!');
+      setisCreatingPost(false);
+      setCreatePostText('Create Post');
+      Alert.alert('Success', 'Post created successfully!', 
+        [
+            {
+                text: 'Cancel',
+                onPress: () => console.log('Cancel Pressed'),
+                style: 'cancel',
+            },
+            {
+                text: 'OK',
+                onPress: () => setNewPost({...newPost, title: '', content: '', images: []}), // Clear the input here
+            },
+        ],
+        { cancelable: false }
+      );
       setShowCreatePostModal(false);
     }
   };
-
   useEffect(() => {
     const loadPosts = async () => {
       const q = query(collection(db, "posts"));
@@ -714,8 +741,9 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                   handleCreatePost();
       
                 }}
+                disabled={isCreatingPost}
               >
-                <Text style={styles.createPostSubmitText}>Create Post</Text>
+                <Text style={styles.createPostSubmitText}>{createPostText}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
