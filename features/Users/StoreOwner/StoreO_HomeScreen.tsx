@@ -88,7 +88,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
   const [newPost, setNewPost] = useState<NewPost>({
     id: '',
     author: currentUser.userName || '',
-    userId: currentUser.id ? String(currentUser.id) : '',
+    userId: currentUser.email || '',
     userType: USER_ROLES[currentUser.role as keyof typeof USER_ROLES].name,
     userRole: (["farmer", "supplier", "consumer", "store_owner"].includes(currentUser.role) ? currentUser.role : "store_owner") as "farmer" | "supplier" | "consumer" | "store_owner",
     createdAt: new Date().toISOString(),
@@ -331,7 +331,7 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                   starRating: item.starRating || 0,
                   totalReviews: item.totalReviews || 0
                 }),
-                currentUser: JSON.stringify(currentUser)
+                itemUserId: JSON.stringify(item.userId),
               }
             });
           }}
@@ -425,13 +425,15 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
         >
           <Text style={styles.actionText}>📍</Text>
         </TouchableOpacity>
-        {item.id !== String(currentUser.email) && (
+        {item.userId !== String(currentUser.email) && (
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => {
             router.push({
               pathname: '/chat',
               params: {
+                itemUserId: item.userId,
+                currentUserId: currentUser.email,
                 conversation: JSON.stringify(
                   {
                     id: item.id,
@@ -443,8 +445,9 @@ export default function StoreO_HomeScreen({ route, navigation }: StoreOwnerHomeS
                     avatar: '🏪',
                   }
                 )
-              }
-              });
+              },
+              
+            });
           }}
         >
           <Text style={styles.actionText}>💬</Text>

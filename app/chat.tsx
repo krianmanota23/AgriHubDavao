@@ -1,4 +1,7 @@
+import { getCurrentUser, UserData } from '@/features/Database/UserData';
+import { db } from '@/firebaseConfig';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, setDoc, updateDoc, where } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -13,7 +16,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentUser, UserData } from '../features/Database/UserData';
 
 interface Message {
   id: number;
@@ -33,13 +35,25 @@ interface Conversation {
   avatar: string;
 }
 
-const ChatScreen: React.FC = () => {
+const combineIds = (params: [string, string]) => {
+  const sortedIds = params.sort();
+  console.log('sortedIds', sortedIds);
+  console.log('combinedId', sortedIds.join('_'));
+  
+  return sortedIds.join('_');
+}
+
+export default function ChatScreen({ route, navigation }: { route: any; navigation: any; }) {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState<string>('');
+  const [convoId, setConvoId] = useState<string>('');
+
+  console.log('useLocalSearchParams params', params);
   
+
   // Parse conversation from params
   const conversation: Conversation = params.conversation 
     ? JSON.parse(params.conversation as string) 
@@ -58,7 +72,6 @@ const ChatScreen: React.FC = () => {
       const userData = await getCurrentUser();
       if (userData) {
         setCurrentUser(userData);
-        loadMessages(userData);
       } else {
         router.replace('/login');
       }
@@ -66,40 +79,36 @@ const ChatScreen: React.FC = () => {
     loadUser();
   }, []);
 
-  const loadMessages = (user: UserData) => {
-    // Load mock messages for the conversation
-    const mockMessages: Message[] = [
-      {
-        id: 1,
-        text: conversation.lastMessage,
-        sender: conversation.name,
-        timestamp: '10:30 AM',
-        isCurrentUser: false,
-      },
-      {
-        id: 2,
-        text: 'Hello! Yes, they are available. How much do you need?',
-        sender: user?.firstName || 'You',
-        timestamp: '10:32 AM',
-        isCurrentUser: true,
-      },
-      {
-        id: 3,
-        text: 'I need about 50kg for my store. What\'s your best price?',
-        sender: conversation.name,
-        timestamp: '10:35 AM',
-        isCurrentUser: false,
-      },
-      {
-        id: 4,
-        text: 'For 50kg, I can offer ₱120 per kg. Quality is guaranteed!',
-        sender: user?.firstName || 'You',
-        timestamp: '10:37 AM',
-        isCurrentUser: true,
-      },
-    ];
-    setMessages(mockMessages);
-  };
+
+  useEffect(() => {
+
+    const nav_params: [string, string] = [String(params.itemUserId), String(params.currentUserId)];
+    const convoId_ = combineIds(nav_params);
+    setConvoId(convoId_);
+
+    const loadMessages = async () => {
+    const q = query(collection(db, "messages"), where("convoId", "==", convoId_), orderBy("timestamp", "desc"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      setMessages([]); // Clear previous messages
+      const messages_: Message[] = [];
+        querySnapshot.forEach((dc) => {
+          const messageData = dc.data();
+          // doc.data() is never undefined for query doc snapshots
+          console.log('doc fields', messageData.message);
+          const message_: Message = {
+            id: messageData.id,
+            text: messageData.message,
+            sender: messageData.sent_by,
+            timestamp: new Date(messageData.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isCurrentUser: messageData.sent_by === params.currentUserId,
+          };
+          messages_.push(message_);
+        });
+        setMessages(messages_);
+      });
+    };
+    loadMessages();
+  }, []);
 
   const getHeaderColor = () => {
     if (!currentUser) return '#4CAF50';
@@ -142,9 +151,46 @@ const ChatScreen: React.FC = () => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isCurrentUser: true,
     };
+    
+    // Add a new document with a generated id.
+    addDoc(collection(db, "messages"), {
+      id:'',
+      message: newMessage,
+      convoId: convoId,
+      sent_by: currentUser?.email,
+      timestamp: new Date(),
+    }).then(async (newMessageDocRef) => {
 
-    setMessages([...messages, message]);
-    setNewMessage('');
+
+      const docConvo = doc(db, "convo", convoId);
+      const docConvoSnap = await getDoc(docConvo);
+
+      if (docConvoSnap.exists()) {
+        console.log("Document data:", docConvoSnap.data());
+        updateDoc(doc(db, "convo", convoId), {
+          last_message: { text: newMessage, sent_by: currentUser?.email },
+          updated_at: new Date(),
+        });
+      } else {
+        const docRef = await setDoc(doc(db, "convo", convoId), {
+          last_message: { text: newMessage, sent_by: currentUser?.email },
+          created_at: new Date(),
+          updated_at: new Date(),
+          users: [currentUser?.email, params.itemUserId],
+        });
+      }
+
+      if(newMessageDocRef.id){
+        updateDoc(doc(db, "messages", newMessageDocRef.id), {
+          id: newMessageDocRef.id,
+          convoId: convoId,
+        });
+      }
+
+      setNewMessage('');
+    }).catch((error) => {
+      console.error("Error adding message: ", error);
+    })
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
@@ -174,6 +220,11 @@ const ChatScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} // Adjust offset as needed
+    >
       <StatusBar barStyle="light-content" backgroundColor={getHeaderColor()} />
       
       {/* Header */}
@@ -198,13 +249,9 @@ const ChatScreen: React.FC = () => {
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContent}
         showsVerticalScrollIndicator={false}
+        inverted={true}
       />
 
-      {/* Message Input */}
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.inputContainer}
-      >
         <View style={styles.inputRow}>
           <TextInput
             style={styles.textInput}
@@ -364,5 +411,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-export default ChatScreen;

@@ -1,7 +1,11 @@
+import { USER_ROLES } from '@/constants/user_roles';
+import { db } from '@/firebaseConfig'; // Import your initialized db 
 import { useRouter } from 'expo-router';
+import { addDoc, collection, doc, onSnapshot, query, setDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   FlatList,
   Image,
   Modal,
@@ -28,27 +32,38 @@ interface ImageData {
 }
 
 interface Post {
-  id: number;
+  id: string;
   author: string;
+  userId: string;
   userType: string;
-  storeName: string;
-  status: 'Selling' | 'Buying';
-  title?: string;
+  userRole: 'farmer' | 'supplier' | 'consumer' | 'store_owner';
+  title: string;
   content: string;
-  timestamp: string;
-  reactions: number;
-  comments: number;
+  createdAt: string;
+  reactions?: number;
+  comments?: number;
+  images?: Array<ImageData>;
+  status: 'Selling' | 'Buying';
   starRating?: number;
   totalReviews?: number;
-  images?: string[];
 }
 
 interface NewPost {
+  id: string;
+  author: string;
+  userId: string;
+  userType: string;
+  userRole: 'farmer' | 'supplier' | 'consumer' | 'store_owner';
+  createdAt: string;
   title: string;
   content: string;
   status: 'Selling' | 'Buying';
-  images: ImageData[];
-  shareLocation: boolean;
+  images?: ImageData[];
+  shareLocation?: boolean;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface FarmerSupplierHomeScreenProps {
@@ -60,34 +75,136 @@ interface FarmerSupplierHomeScreenProps {
   navigation: any;
 }
 
+
 const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigation }) => {
-  const router = useRouter();
+
   const { user } = route.params;
   const [currentUser, setCurrentUser] = useState<UserData>(user);
   const [showBurgerMenu, setShowBurgerMenu] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('Home');
   const scrollViewRef = useRef<ScrollView>(null);
+  const slideAnim = useRef(new Animated.Value(300)).current;
   const [showCreatePostModal, setShowCreatePostModal] = useState<boolean>(false);
   const [newPost, setNewPost] = useState<NewPost>({
+    id: '',
+    author: currentUser.userName || '',
+    userId: currentUser.email || '',
+    userType: USER_ROLES[currentUser.role as keyof typeof USER_ROLES].name,
+    userRole: (["farmer", "supplier", "consumer", "store_owner"].includes(currentUser.role) ? currentUser.role : "store_owner") as "farmer" | "supplier" | "consumer" | "store_owner",
+    createdAt: new Date().toISOString(),
     title: '',
     content: '',
     status: 'Selling',
     images: [],
     shareLocation: false
   });
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+  const [selectedFilter, setSelectedFilter] = useState<string>('All');
+  const [newComment, setNewComment] = useState<string>('');
+  const [commentImages, setCommentImages] = useState<ImageData[]>([]);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [isCreatingPost, setisCreatingPost] = useState<boolean>(false);
+  const [createPostText, setCreatePostText] = useState<String>('Create Post');
+
+
+  const router = useRouter();
   const [showCommentsModal, setShowCommentsModal] = useState<boolean>(false);
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [showMessageModal, setShowMessageModal] = useState<boolean>(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [newComment, setNewComment] = useState<string>('');
-  const [commentImages, setCommentImages] = useState<ImageData[]>([]);
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
   const [newMessage, setNewMessage] = useState<string>('');
+
+  const handleCreatePost = async () => {
+    try {
+
+      setisCreatingPost(true);
+      setCreatePostText('Creating Post...');
+
+      addDoc(collection(db, "posts"), newPost).then((postRef) => {
+
+        const updatePostRef = doc(db, "posts", postRef.id);
+
+        setDoc(updatePostRef, { id: postRef.id }, { merge: true });
+
+      });
+
+    } catch (error) {
+      console.error("Error creating post:", error);
+    } finally {
+      setisCreatingPost(false);
+      setCreatePostText('Create Post');
+      Alert.alert('Success', 'Post created successfully!', 
+        [
+            {
+                text: 'Cancel',
+                onPress: () => console.log('Cancel Pressed'),
+                style: 'cancel',
+            },
+            {
+                text: 'OK',
+                onPress: () => setNewPost({...newPost, title: '', content: '', images: []}), // Clear the input here
+            },
+        ],
+        { cancelable: false }
+      );
+      setShowCreatePostModal(false);
+    }
+  };
+
+useEffect(() => {
+    const loadPosts = async () => {
+      const q = query(collection(db, "posts"));
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const posts: Post[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+
+          const d = new Date(data.createdAt);
+          const options = {
+              weekday: 'long' as const,
+              year: 'numeric' as const,
+              month: 'long' as const,
+              day: 'numeric' as const,
+              hour: '2-digit' as const,
+              minute: '2-digit' as const,
+          };
+          const time_stamp = d.toLocaleDateString('en-US', options);
+
+          const post: Post = {
+            id: data.id,
+            author: data.author,
+            userId: data.userId,
+            userType: data.userType,
+            userRole: data.userRole,
+            title: data.title,
+            content: data.content,
+            createdAt: time_stamp,
+            reactions: data.reactions,
+            comments: data.comments,
+            images: data.images,
+            status: data.status,
+            starRating: data.starRating,
+            totalReviews: data.totalReviews,
+            // Add other fields if needed
+          }
+          posts.push({...post});
+        });
+        setAllPosts(posts);
+      });
+    };
+    loadPosts();
+  }, []);
+
+
 
   useEffect(() => {
     const loadCurrentUser = async () => {
       const userData = await getCurrentUser();
       if (userData) {
+        console.log('user data: ', userData);
+
         setCurrentUser(userData);
       }
     };
@@ -119,49 +236,8 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
     }
   };
 
-  // Mock data for Store Owner posts (visible to Farmer/Supplier)
-  const storeOwnerPosts: Post[] = [
-    {
-      id: 1,
-      author: 'Christian Manota',
-      userType: 'Store Owner',
-      storeName: 'Manota Store',
-      status: 'Buying',
-      title: 'Looking for Vegetables Supplier',
-      content: 'Need regular supply for my store. Competitive prices offered.',
-      timestamp: '30 minutes ago',
-      reactions: 12,
-      comments: 4,
-      images: ['https://via.placeholder.com/300x200/2196F3/FFFFFF?text=Vegetables+Needed'],
-    },
-    {
-      id: 2,
-      author: 'Maria Garcia',
-      userType: 'Store Owner',
-      storeName: 'Garcia Market',
-      status: 'Buying',
-      title: 'Rice Supplier Needed',
-      content: 'Need 100kg weekly. Long-term partnership preferred.',
-      timestamp: '2 hours ago',
-      reactions: 18,
-      comments: 7,
-    },
-    {
-      id: 3,
-      author: 'John Smith',
-      userType: 'Store Owner',
-      storeName: 'Smith Grocery',
-      status: 'Buying',
-      title: 'Fruit Supplier Wanted',
-      content: 'Looking for quality products at reasonable prices.',
-      timestamp: '5 hours ago',
-      reactions: 15,
-      comments: 6,
-    },
-  ];
-
   // Filter only buying posts for farmers/suppliers
-  const buyingPosts = storeOwnerPosts.filter(post => post.status === 'Buying');
+  const buyingPosts = allPosts.filter(post => post.status === 'Buying');
 
   const handleLogout = async () => {
     Alert.alert(
@@ -181,127 +257,153 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
   };
 
   const renderPost = ({ item }: { item: Post }) => (
-    <View style={styles.postContainer}>
-      <View style={styles.postHeader}>
-        <TouchableOpacity 
-          style={styles.profilePicture}
-          onPress={() => {
-            if (item.userType === 'Store Owner') {
+      <View style={styles.postContainer}>
+        <View style={styles.postHeader}>
+          <TouchableOpacity 
+            style={styles.profilePicture}
+            onPress={() => {
+              const role_item = USER_ROLES[currentUser.role as keyof typeof USER_ROLES].profile_view;
               router.push({
-                pathname: '/storeo-profile-view',
+                pathname: role_item as any,
                 params: {
-                  storeOwner: JSON.stringify(item),
-                  currentUser: JSON.stringify(currentUser)
+                  farmerSupplier: JSON.stringify({
+                    author: item.author,
+                    starRating: item.starRating || 0,
+                    totalReviews: item.totalReviews || 0
+                  }),
+                  itemUserId: JSON.stringify(item.userId),
                 }
               });
-            }
-          }}
-        >
-          <Text style={styles.profilePictureText}>
-            {item.userType === 'Store Owner' ? '🏪' : '👤'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.authorInfo}
-          onPress={() => {
-            if (item.userType === 'Store Owner') {
-              router.push({
-                pathname: '/storeo-profile-view',
-                params: {
-                  storeOwner: JSON.stringify(item),
-                  currentUser: JSON.stringify(currentUser)
-                }
-              });
-            }
-          }}
-        >
-          <Text style={styles.authorName}>{item.storeName}</Text>
-          <Text style={styles.userType}>{item.userType}</Text>
-          <Text style={styles.storeName}>{item.author}</Text>
-          {/* Star Rating for Store Owners */}
-          {item.starRating && (
-            <View style={styles.ratingContainer}>
-              <View style={styles.starsContainer}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Text key={star} style={[
-                    styles.star,
-                    star <= Math.floor(item.starRating!) ? styles.filledStar : styles.emptyStar
-                  ]}>
-                    {star <= Math.floor(item.starRating!) ? '★' : '☆'}
-                  </Text>
-                ))}
+            }}
+          >
+            <Text style={styles.profilePictureText}>
+              {item.userType === 'Farmer/Supplier' ? '🌾' : '👤'}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.authorInfo}>
+            <TouchableOpacity 
+              onPress={() => {
+                const role_item = USER_ROLES[currentUser.role as keyof typeof USER_ROLES].profile_view;
+                router.push({
+                  pathname: role_item as any,
+                  params: {
+                    farmerSupplier: JSON.stringify({
+                      author: item.author,
+                      starRating: item.starRating || 0,
+                      totalReviews: item.totalReviews || 0
+                    }),
+                    currentUser: JSON.stringify(currentUser)
+                  }
+                });
+              }}
+            >
+              <Text style={styles.authorName}>{item.author}</Text>
+              <Text style={styles.userType}>{item.userType}</Text>
+            </TouchableOpacity>
+            
+            {item.starRating && (
+              <View style={styles.ratingContainer}>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Text key={star} style={[
+                      styles.star,
+                      star <= Math.floor(item.starRating!) ? styles.filledStar : styles.emptyStar
+                    ]}>
+                      {star <= Math.floor(item.starRating!) ? '★' : '☆'}
+                    </Text>
+                  ))}
+                </View>
+                <Text style={styles.ratingText}>{item.starRating} ({item.totalReviews})</Text>
               </View>
-              <Text style={styles.ratingText}>{item.starRating} ({item.totalReviews})</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <View style={[styles.statusBadge, 
-          { backgroundColor: item.status === 'Buying' ? '#FF9800' : '#4CAF50' }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+            )}
+          </View>
+          <View style={[styles.statusBadge, 
+            { backgroundColor: item.status === 'Buying' ? '#FF9800' : '#4CAF50' }]}>
+            <Text style={styles.statusText}>{item.status}</Text>
+          </View>
+        </View>
+        
+        {item.title && (
+          <Text style={styles.postTitle}>{item.title}</Text>
+        )}
+        
+        <Text style={styles.postContent}>{item.content}</Text>
+        
+        {item.images && item.images.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.postImagesContainer}>
+            {item.images.map((imageUri, index) => (
+              <Image key={index} source={{ uri: imageUri.uri as any }} style={styles.postImage} />
+            ))}
+          </ScrollView>
+        )}
+        
+        <View style={styles.postFooter}>
+          <Text style={styles.timestamp}>{item.createdAt}</Text>
+        </View>
+        
+        <View style={styles.postActions}>
+          <TouchableOpacity style={styles.actionButton}>
+            <Text style={styles.actionText}>👍</Text>
+            <Text style={styles.actionCount}>{item.reactions}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => {
+              setSelectedPost(item);
+              setShowCommentsModal(true);
+            }}
+          >
+            <Text style={styles.actionText}>💭</Text>
+            <Text style={styles.actionCount}>{item.comments}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => {
+              setSelectedPost(item);
+              setShowLocationModal(true);
+            }}
+          >
+            <Text style={styles.actionText}>📍</Text>
+          </TouchableOpacity>
+          {item.userId !== String(currentUser.email) && (
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => {
+              router.push({
+                pathname: '/chat',
+                params: {
+                  itemUserId: item.userId,
+                  currentUserId: currentUser.email,
+                  conversation: JSON.stringify(
+                    {
+                      id: item.id,
+                      name: item.author,
+                      userType: USER_ROLES[item.userRole as keyof typeof USER_ROLES].name,
+                      lastMessage: '',
+                      timestamp: '',
+                      unreadCount: 0,
+                      avatar: '🏪',
+                    }
+                  )
+                },
+                
+              });
+            }}
+          >
+            <Text style={styles.actionText}>💬</Text>
+          </TouchableOpacity>)}
         </View>
       </View>
-      
-      {/* Post Title */}
-      {item.title && (
-        <Text style={styles.postTitle}>{item.title}</Text>
-      )}
-      
-      <Text style={styles.postContent}>{item.content}</Text>
-      
-      {/* Post Images */}
-      {item.images && item.images.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.postImagesContainer}>
-          {item.images.map((imageUri, index) => (
-            <Image key={index} source={{ uri: imageUri }} style={styles.postImage} />
-          ))}
-        </ScrollView>
-      )}
-      
-      <View style={styles.postFooter}>
-        <Text style={styles.timestamp}>{item.timestamp}</Text>
-      </View>
-      
-      <View style={styles.postActions}>
-        <TouchableOpacity style={styles.actionButton}>
-          <Text style={styles.actionText}>👍</Text>
-          <Text style={styles.actionCount}>{item.reactions}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => {
-            setSelectedPost(item);
-            setShowCommentsModal(true);
-          }}
-        >
-          <Text style={styles.actionText}>💭</Text>
-          <Text style={styles.actionCount}>{item.comments}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => {
-            setSelectedPost(item);
-            setShowLocationModal(true);
-          }}
-        >
-          <Text style={styles.actionText}>📍</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => {
-            if (item.userType === 'Store Owner') {
-              setSelectedPost(item);
-              setShowMessageModal(true);
-            } else {
-              Alert.alert('Not Available', 'You can only message Store Owners.');
-            }
-          }}
-        >
-          <Text style={styles.actionText}>💬</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  
+  const getFilteredPosts = () => {
+    if (selectedFilter === 'All') {
+      return allPosts;
+    }
+    return allPosts.filter(post => post.userType === selectedFilter);
+  };
 
+  let filteredPosts = getFilteredPosts();
   const renderBurgerMenuItem = (title: string, onPress: () => void) => (
     <TouchableOpacity style={styles.burgerMenuItem} onPress={onPress}>
       <Text style={styles.burgerMenuText}>{title}</Text>
@@ -336,7 +438,7 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
       type: 'image/jpeg',
       name: 'sample.jpg'
     };
-    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+    setNewPost({ ...newPost, images: [...(newPost.images ?? []), mockImage] });
   };
 
   const openCamera = () => {
@@ -345,11 +447,11 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
       type: 'image/jpeg',
       name: 'camera.jpg'
     };
-    setNewPost({ ...newPost, images: [...newPost.images, mockImage] });
+    setNewPost({ ...newPost, images: [...(newPost.images ?? []), mockImage] });
   };
 
   const removeImage = (index: number) => {
-    const newImages = [...newPost.images];
+    const newImages = [...(newPost.images ?? [])];
     newImages.splice(index, 1);
     setNewPost({ ...newPost, images: newImages });
   };
@@ -522,11 +624,11 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
                   </TouchableOpacity>
                 </View>
                 
-                {newPost.images.length > 0 && (
+                {(newPost.images?.length ?? 0) > 0 && (
                   <View style={styles.imagePreviewContainer}>
                     <Text style={styles.previewLabel}>Selected Images:</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {newPost.images.map((image, index) => (
+                    <ScrollView showsHorizontalScrollIndicator={false}>
+                       {newPost.images?.map((image, index) => (
                         <View key={index} style={styles.imagePreview}>
                           <Image source={{ uri: image.uri }} style={styles.previewImage} />
                           <TouchableOpacity 
@@ -563,15 +665,15 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
                <TouchableOpacity 
                  style={styles.submitButton}
                  onPress={() => {
-                  if (newPost.content.trim()) {
-                    const locationText = newPost.shareLocation ? ' with location' : '';
-                    Alert.alert('Success', `Post created successfully${locationText}!` );
-                    setNewPost({title: '', content: '', status: 'Selling', images: [], shareLocation: false});
-                    setShowCreatePostModal(false);
-                  } else {
-                    Alert.alert('Error', 'Please enter post content');
+                  if (!newPost.content.trim()) {
+                    Alert.alert('Error', 'Please enter content for your post');
+                    return;
                   }
+
+                  handleCreatePost();
+      
                 }}
+                disabled={isCreatingPost}
                >
                  <Text style={styles.submitButtonText}>Create Post</Text>
                </TouchableOpacity>
@@ -601,8 +703,8 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
             {selectedPost && (
               <View style={styles.postPreview}>
                 <View style={styles.postPreviewHeader}>
-                  <Text style={styles.postPreviewAuthor}>{selectedPost.storeName || selectedPost.author}</Text>
-                  <Text style={styles.postPreviewTime}>{selectedPost.timestamp}</Text>
+                  <Text style={styles.postPreviewAuthor}>{selectedPost.author || selectedPost.author}</Text>
+                  <Text style={styles.postPreviewTime}>{selectedPost.createdAt}</Text>
                 </View>
                 <Text style={styles.postPreviewContent} numberOfLines={2}>
                   {selectedPost.content}
@@ -765,7 +867,7 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
         <View style={styles.modalOverlay}>
           <View style={styles.messageModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Message {selectedPost?.storeName || selectedPost?.author}</Text>
+              <Text style={styles.modalTitle}>Message {selectedPost?.author}</Text>
               <TouchableOpacity onPress={() => setShowMessageModal(false)}>
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
@@ -779,7 +881,7 @@ const FS_HomeScreen: React.FC<FarmerSupplierHomeScreenProps> = ({ route, navigat
               </View>
               
               <View style={[styles.messageItem, styles.receivedMessage]}>
-                <Text style={styles.messageAuthor}>{selectedPost?.storeName || selectedPost?.author}</Text>
+                <Text style={styles.messageAuthor}>{selectedPost?.author}</Text>
                 <Text style={styles.messageText}>Great! What products do you have and what are your prices?</Text>
                 <Text style={styles.messageTime}>1:50 PM</Text>
               </View>
@@ -1058,7 +1160,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalScrollContainer: {
-    flexGrow: 1,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100%',

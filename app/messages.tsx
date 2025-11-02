@@ -1,3 +1,4 @@
+import { clearCurrentUser, getCurrentUser, UserData } from '@/features/Database/UserData';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -16,7 +17,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Consumer_Footer from '../components/navigation-components/Consumer_Footer';
 import FS_Footer from '../components/navigation-components/FS_Footer';
 import StoreO_Footer from '../components/navigation-components/StoreO_Footer';
-import { clearCurrentUser, getCurrentUser, UserData } from '../features/Database/UserData';
 
 interface Conversation {
   id: number;
@@ -24,9 +24,24 @@ interface Conversation {
   userType: string;
   lastMessage: string;
   timestamp: string;
+  email?: string;
   unreadCount: number;
   avatar: string;
 }
+
+// const checkFieldExistence = async (collectionName: any, documentId: any, ) => {
+  // const docRef = doc(db, collectionName, documentId);
+  // const docSnap = await getDoc(docRef);
+
+//   const collectionRef = collection(db, 'users', documentId, collectionName);
+//   const snapshot = await getDocs(collectionRef);
+//   console.log('snapshot of subcollection', snapshot);
+
+//   return !snapshot.empty; // Returns true if the collection has documents, false otherwise
+
+// };
+
+
 
 const MessagesScreen: React.FC = () => {
   const router = useRouter();
@@ -38,6 +53,8 @@ const MessagesScreen: React.FC = () => {
   const [showBurgerMenu, setShowBurgerMenu] = useState<boolean>(false);
 
   useEffect(() => {
+    console.log('messages page');
+    
     const loadCurrentUser = async () => {
       const userData = await getCurrentUser();
       if (userData) {
@@ -50,8 +67,9 @@ const MessagesScreen: React.FC = () => {
     loadCurrentUser();
   }, []);
 
-  const loadConversations = (role: string) => {
+  const loadConversations = async (role: string) => {
     let mockConversations: Conversation[] = [];
+
     
     if (role === 'supplier' || role === 'farmer') {
       mockConversations = [
@@ -92,6 +110,7 @@ const MessagesScreen: React.FC = () => {
           lastMessage: 'Fresh vegetables ready for pickup',
           timestamp: '5 min ago',
           unreadCount: 1,
+          email: 'danz@gmail.com',
           avatar: '🌾',
         },
         {
@@ -101,6 +120,7 @@ const MessagesScreen: React.FC = () => {
           lastMessage: 'Do you have organic tomatoes?',
           timestamp: '30 min ago',
           unreadCount: 0,
+          email: 'danz2@gmail.com',
           avatar: '👤',
         },
         {
@@ -111,6 +131,7 @@ const MessagesScreen: React.FC = () => {
           timestamp: '2 hours ago',
           unreadCount: 3,
           avatar: '🌾',
+          email: 'danz3@gmail.com',
         },
       ];
     } else if (role === 'consumer') {
@@ -228,6 +249,7 @@ const MessagesScreen: React.FC = () => {
           pathname: '/chat',
           params: {
             conversation: JSON.stringify(item),
+            currentUser: JSON.stringify(item.email),
           },
         });
       }}
